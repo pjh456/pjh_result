@@ -293,6 +293,8 @@ namespace pjh::result
              * @param f 接受 T 返回 Result<U, E> 的可调用对象
              */
             template <typename F>
+                requires result_helper::ResultType<
+                    std::invoke_result_t<F, const T &>>
             auto and_then(F &&f)
                 const & -> std::invoke_result_t<F, const T &>
             {
@@ -304,6 +306,8 @@ namespace pjh::result
             }
 
             template <typename F>
+                requires result_helper::ResultType<
+                    std::invoke_result_t<F, T>>
             auto and_then(F &&f)
                 && -> std::invoke_result_t<F, T>
             {

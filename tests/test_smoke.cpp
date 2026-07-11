@@ -46,5 +46,13 @@ int main()
     v.push_back(src);
     assert(v.size() == 2 && v[0].unwrap() == 1 && v[1].unwrap() == 7);
 
+    // bug4: and_then 链，f 返回 Result
+    auto chained = Result<int, std::string>::Ok(3).and_then(
+        [](int x) { return Result<int, std::string>::Ok(x + 100); });
+    assert(chained.unwrap() == 103);
+    auto shortcut = Result<int, std::string>::Err(std::string("e")).and_then(
+        [](int x) { return Result<int, std::string>::Ok(x + 100); });
+    assert(shortcut.is_err() && shortcut.unwrap_err() == "e");
+
     return 0;
 }
