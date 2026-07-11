@@ -223,6 +223,20 @@ namespace pjh::result
                 return static_cast<bool>(std::invoke(f, value_));
         }
 
+        /**
+         * @brief Whether the option is None and the nullary predicate @p f returns true.
+         *
+         * @tparam F nullary predicate
+         * @param f the predicate
+         * @return `is_none() && bool(f())`
+         */
+        template <typename F>
+            requires std::invocable<F>
+        [[nodiscard]] bool is_none_and(F &&f) const
+        {
+            return !has_value_ && static_cast<bool>(std::invoke(f));
+        }
+
     public:
         /**
          * @brief Unwraps the contained value; throws if None. Available only when `T` is non-void.

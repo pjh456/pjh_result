@@ -56,3 +56,22 @@ TEST_CASE("is_some_and checks the value")
     CHECK_FALSE(none.is_some_and([](int)
                                  { return true; }));
 }
+
+TEST_CASE("is_none_and checks None")
+{
+    auto none = res::Option<int>::None();
+    CHECK(none.is_none_and(
+        []
+        { return true; }));
+    CHECK_FALSE(none.is_none_and(
+        []
+        { return false; }));
+
+    auto some = res::Option<int>::Some(10);
+    CHECK_FALSE(some.is_none_and(
+        []
+        { return true; }));
+    CHECK_FALSE(some.is_none_and(
+        []
+        { return false; }));
+}
