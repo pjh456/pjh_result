@@ -58,6 +58,7 @@ TEST_CASE("rvalue unwrap leaves Result in moved state")
     CHECK(v == 42);
     CHECK_FALSE(r.is_ok());
     CHECK_FALSE(r.is_err());
+    CHECK(r.is_moved());
     CHECK_THROWS_AS((void)r.unwrap(), bad_access);
 }
 
@@ -68,6 +69,7 @@ TEST_CASE("rvalue unwrap_err leaves Result in moved state")
     CHECK(e == "e");
     CHECK_FALSE(r.is_ok());
     CHECK_FALSE(r.is_err());
+    CHECK(r.is_moved());
     CHECK_THROWS_AS((void)r.unwrap_err(), bad_access);
 }
 
@@ -77,6 +79,7 @@ TEST_CASE("rvalue expect leaves Result in moved state")
     int v = std::move(r).expect("ok");
     CHECK(v == 7);
     CHECK_FALSE(r.is_ok());
+    CHECK(r.is_moved());
     CHECK_THROWS_AS((void)r.expect("used after moved"), bad_access);
 }
 
@@ -86,6 +89,7 @@ TEST_CASE("rvalue expect_err leaves Result in moved state")
     std::string e = std::move(r).expect_err("err");
     CHECK(e == "err");
     CHECK_FALSE(r.is_err());
+    CHECK(r.is_moved());
     CHECK_THROWS_AS((void)r.expect_err("used after moved"), bad_access);
 }
 

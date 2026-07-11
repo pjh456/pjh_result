@@ -117,8 +117,9 @@ namespace pjh::result
      * either a success value `T` or an error `E` — exactly one of the two.
      *
      * Storage is a hand-written tagged union rather than `std::variant`:
-     * - there is no "third state" such as `valueless_by_exception`; `is_ok()` and
-     *   `is_err()` are always complementary;
+     * - there is no "third state" such as `valueless_by_exception`;
+     *   `is_ok()`, `is_err()` and `is_moved()` are mutually exclusive; exactly one
+     *   holds at any time, except during construction and destruction.
      * - access does not go through `std::get`'s runtime check — the active member is
      *   read directly.
      *
@@ -341,6 +342,8 @@ namespace pjh::result
         bool is_ok() const noexcept { return tag_ == detail::Tag::Ok; }
         /// @brief Whether the result is currently in the Err state.
         bool is_err() const noexcept { return tag_ == detail::Tag::Err; }
+        /// @brief Whether the result is in the moved-from state (post rvalue-unwrap).
+        bool is_moved() const noexcept { return tag_ == detail::Tag::Moved; }
 
         /**
          * @brief Whether the result is Ok and the success value satisfies @p f.
