@@ -1,9 +1,11 @@
 # pjh_result
 
-A header-only, C++20 port of Rust's `Result<T, E>` for expressive, exception-light error handling.
+A header-only, C++20 port of Rust's `Result<T, E>` and `Option<T>` for expressive,
+exception-light error handling.
 
 `Result<T, E>` holds **either** a success value `T` **or** an error `E` — never both, never
 neither. It forces callers to acknowledge failure instead of silently ignoring it.
+`Option<T>` holds **either** a value (`Some`) **or** nothing (`None`).
 
 ## Features
 
@@ -15,6 +17,7 @@ neither. It forces callers to acknowledge failure instead of silently ignoring i
 - **`T = void` support** — for fallible operations that return no value.
 - **Monadic combinators** — `map`, `map_err`, `and_then`.
 - **Rust `?`-style propagation** — the `ASSIGN_OR_RETURN` and `TRY` macros.
+- **`Option<T>` too** — the same design, with `Some`/`None` and `Option`→`Result` bridging.
 - **Header-only**, no runtime dependencies.
 
 ## Requirements
@@ -89,6 +92,23 @@ int main()
 > **Note:** `T` and `E` must be distinct types, and their move constructors must be
 > `noexcept`. Both are enforced at compile time.
 
+## Option at a glance
+
+`pjh::result::Option<T>` mirrors the same design (hand-written storage, `nothrow`-move
+invariant, strong exception guarantee, `T = void` support).
+
+| Category | Members |
+|---|---|
+| Construct | `Some(v)`, `Some()` (when `T = void`), `None()` |
+| Inspect | `is_some()`, `is_none()`, `is_some_and(f)`, `operator==` |
+| Extract | `unwrap()`, `unwrap_or(v)`, `unwrap_or_else(f)`, `unwrap_or_default()`, `expect(msg)` |
+| Transform | `map(f)`, `map_or(def, f)`, `map_or_else(d, f)`, `inspect(f)` |
+| Chain | `and_then(f)`, `or_else(f)`, `filter(pred)` |
+| Mutate | `take()`, `replace(v)`, `insert(v)`, `get_or_insert(v)` |
+| To Result | `ok_or(e)`, `ok_or_else(f)` |
+
+`unwrap`/`expect` throw `pjh::result::bad_result_access` when called on `None`.
+
 ## Examples
 
 Runnable programs under [`examples/`](examples/):
@@ -100,6 +120,9 @@ Runnable programs under [`examples/`](examples/):
 | `error_prop.cpp` | `ASSIGN_OR_RETURN` and `TRY` propagation |
 | `void_result.cpp` | `Result<void, E>` |
 | `custom_error.cpp` | enum and struct error types |
+| `option_basic.cpp` | `Option` construction, inspection, unwrapping |
+| `option_chain.cpp` | chaining `map` / `filter` / `and_then` / `or_else` |
+| `option_interop.cpp` | `Option` → `Result` via `ok_or` / `ok_or_else` |
 
 ## Building tests & examples
 
