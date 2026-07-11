@@ -4,9 +4,9 @@
 
 #include "pjh_result/result.hpp"
 
-namespace rp = pjh::result::utils;
+namespace res = pjh::result;
 
-using IntResult = rp::Result<int, std::string>;
+using IntResult = res::Result<int, std::string>;
 
 // Succeeds only for non-negative inputs.
 static IntResult checked(int x)

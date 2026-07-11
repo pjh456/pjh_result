@@ -5,25 +5,25 @@
 #include "pjh_result/macros.hpp"
 #include "pjh_result/result.hpp"
 
-namespace rp = pjh::result::utils;
+namespace res = pjh::result;
 
-static rp::Result<int, std::string> parse(bool good)
+static res::Result<int, std::string> parse(bool good)
 {
     if (!good)
-        return rp::Result<int, std::string>::Err(std::string("bad"));
-    return rp::Result<int, std::string>::Ok(10);
+        return res::Result<int, std::string>::Err(std::string("bad"));
+    return res::Result<int, std::string>::Ok(10);
 }
 
-static rp::Result<int, std::string> use_assign(bool good)
+static res::Result<int, std::string> use_assign(bool good)
 {
     ASSIGN_OR_RETURN(v, parse(good));
-    return rp::Result<int, std::string>::Ok(v + 1);
+    return res::Result<int, std::string>::Ok(v + 1);
 }
 
-static rp::Result<void, std::string> use_try(bool good)
+static res::Result<void, std::string> use_try(bool good)
 {
     TRY(parse(good));
-    return rp::Result<void, std::string>::Ok();
+    return res::Result<void, std::string>::Ok();
 }
 
 TEST_CASE("ASSIGN_OR_RETURN unwraps on Ok, propagates on Err")

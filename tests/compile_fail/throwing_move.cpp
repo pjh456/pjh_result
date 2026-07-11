@@ -5,7 +5,7 @@
 
 int main()
 {
-    auto r = pjh::result::utils::Result<pjh_test::ThrowingMove, int>::Err(1);
+    auto r = pjh::result::Result<pjh_test::ThrowingMove, int>::Err(1);
     (void)r;
     return 0;
 }

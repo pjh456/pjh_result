@@ -1,16 +1,16 @@
 /**
  * @file errors.hpp
- * @brief Exception type thrown on invalid `Result` access.
+ * @brief Exception type thrown on invalid `Result` / `Option` access.
  */
-#ifndef INCLUDE_PJH_RESULT_BAD_RESULT_ACCESS_HPP
-#define INCLUDE_PJH_RESULT_BAD_RESULT_ACCESS_HPP
+#ifndef INCLUDE_PJH_RESULT_ERRORS_HPP
+#define INCLUDE_PJH_RESULT_ERRORS_HPP
 
 #include <stdexcept>
 #include <string>
 
-namespace pjh::result::utils::result_helper
+namespace pjh::result
 {
-    /// @brief Thrown when unwrapping a `Result` in the wrong state (e.g. `unwrap()` on Err).
+    /// @brief Thrown when unwrapping in the wrong state (e.g. `unwrap()` on Err / None).
     class bad_result_access : public std::logic_error
     {
     public:
@@ -22,4 +22,4 @@ namespace pjh::result::utils::result_helper
     };
 }
 
-#endif // INCLUDE_PJH_RESULT_BAD_RESULT_ACCESS_HPP
+#endif // INCLUDE_PJH_RESULT_ERRORS_HPP

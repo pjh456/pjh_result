@@ -26,7 +26,7 @@
     auto RESULT_UNIQUE_VAR(_res_) = (expr);                                                     \
     if (RESULT_UNIQUE_VAR(_res_).is_err())                                                      \
     {                                                                                           \
-        return pjh::result::utils::Failure{std::move(RESULT_UNIQUE_VAR(_res_).unwrap_err())};  \
+        return pjh::result::Failure{std::move(RESULT_UNIQUE_VAR(_res_).unwrap_err())};  \
     }                                                                                           \
     auto var_name = std::move(RESULT_UNIQUE_VAR(_res_).unwrap())
 
@@ -44,7 +44,7 @@
         auto RESULT_UNIQUE_VAR(_res_) = (expr);                                                     \
         if (RESULT_UNIQUE_VAR(_res_).is_err())                                                      \
         {                                                                                           \
-            return pjh::result::utils::Failure{std::move(RESULT_UNIQUE_VAR(_res_).unwrap_err())};  \
+            return pjh::result::Failure{std::move(RESULT_UNIQUE_VAR(_res_).unwrap_err())};  \
         }                                                                                           \
     } while (0)
 

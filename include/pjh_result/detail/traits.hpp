@@ -8,7 +8,7 @@
 #include <type_traits>
 #include <concepts>
 
-namespace pjh::result::utils::result_helper
+namespace pjh::result::detail
 {
     /// @brief Primary template; specialized (in result.hpp) for each `Result<T, E>` to
     ///        expose its `value_type` and `error_type`.

@@ -4,7 +4,7 @@
 
 #include "pjh_result/result.hpp"
 
-namespace rp = pjh::result::utils;
+namespace res = pjh::result;
 
 // An enum error type.
 enum class FileError
@@ -32,18 +32,18 @@ static const char *to_string(FileError e)
     return "Unknown";
 }
 
-static rp::Result<int, FileError> open_file(bool exists)
+static res::Result<int, FileError> open_file(bool exists)
 {
     if (!exists)
-        return rp::Result<int, FileError>::Err(FileError::NotFound);
-    return rp::Result<int, FileError>::Ok(3); // pretend fd
+        return res::Result<int, FileError>::Err(FileError::NotFound);
+    return res::Result<int, FileError>::Ok(3); // pretend fd
 }
 
-static rp::Result<int, ParseError> parse(const std::string &s)
+static res::Result<int, ParseError> parse(const std::string &s)
 {
     if (s.empty())
-        return rp::Result<int, ParseError>::Err(ParseError{"empty input", 0});
-    return rp::Result<int, ParseError>::Ok(static_cast<int>(s.size()));
+        return res::Result<int, ParseError>::Err(ParseError{"empty input", 0});
+    return res::Result<int, ParseError>::Ok(static_cast<int>(s.size()));
 }
 
 int main()

@@ -4,10 +4,10 @@
 
 #include "pjh_result/result.hpp"
 
-namespace rp = pjh::result::utils;
+namespace res = pjh::result;
 
-using IntResult = rp::Result<int, std::string>;
-using VoidResult = rp::Result<void, std::string>;
+using IntResult = res::Result<int, std::string>;
+using VoidResult = res::Result<void, std::string>;
 
 TEST_CASE("equal Ok values compare equal")
 {

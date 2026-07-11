@@ -44,8 +44,8 @@ Add `include/` to your include path — there is nothing to compile.
 #include "pjh_result/result.hpp"
 #include "pjh_result/macros.hpp"
 
-namespace rp = pjh::result::utils;
-using IntResult = rp::Result<int, std::string>;
+namespace res = pjh::result;
+using IntResult = res::Result<int, std::string>;
 
 IntResult parse_positive(int x)
 {
@@ -84,7 +84,7 @@ int main()
 | Chain | `and_then(f)`, `or_else(f)` |
 | Propagate | `ASSIGN_OR_RETURN(name, expr)`, `TRY(expr)` (from `macros.hpp`) |
 
-`unwrap*` and `expect*` throw `pjh::result::utils::result_helper::bad_result_access` on the wrong state.
+`unwrap*` and `expect*` throw `pjh::result::bad_result_access` on the wrong state.
 
 > **Note:** `T` and `E` must be distinct types, and their move constructors must be
 > `noexcept`. Both are enforced at compile time.
