@@ -1,5 +1,6 @@
 #include <doctest/doctest.h>
 
+#include <memory>
 #include <string>
 
 #include "pjh_result/option.hpp"
@@ -108,5 +109,17 @@ TEST_CASE("filter keeps or drops the value")
     auto none = res::Option<int>::None().filter(
         [](int)
         { return true; });
+    CHECK(none.is_none());
+}
+
+TEST_CASE("filter rvalue works with move-only type")
+{
+    auto o = res::Option<std::unique_ptr<int>>::Some(std::unique_ptr<int>(new int(42)));
+    auto kept = std::move(o).filter([](const std::unique_ptr<int> &p) { return *p > 0; });
+    CHECK(kept.is_some());
+    CHECK(*kept.unwrap() == 42);
+
+    auto empty = res::Option<std::unique_ptr<int>>::None();
+    auto none = std::move(empty).filter([](const std::unique_ptr<int> &) { return true; });
     CHECK(none.is_none());
 }
