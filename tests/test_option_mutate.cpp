@@ -54,6 +54,31 @@ TEST_CASE("get_or_insert only inserts when None")
     CHECK(some.unwrap() == 1);
 }
 
+TEST_CASE("get_or_insert_default default-constructs when None")
+{
+    auto none = res::Option<int>::None();
+    int &r = none.get_or_insert_default();
+    CHECK(r == 0);
+    CHECK(none.unwrap() == 0);
+    r = 42;
+    CHECK(none.unwrap() == 42);
+
+    auto some = res::Option<int>::Some(7);
+    CHECK(some.get_or_insert_default() == 7);
+}
+
+TEST_CASE("get_or_insert_with calls f when None")
+{
+    auto none = res::Option<int>::None();
+    CHECK(none.get_or_insert_with([] { return 99; }) == 99);
+    CHECK(none.unwrap() == 99);
+
+    auto some = res::Option<int>::Some(5);
+    bool called = false;
+    CHECK(some.get_or_insert_with([&] { called = true; return -1; }) == 5);
+    CHECK(!called);
+}
+
 TEST_CASE("mutations do not leak")
 {
     InstanceCounter::reset();

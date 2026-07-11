@@ -920,6 +920,44 @@ namespace pjh::result
             return value_;
         }
 
+        /**
+         * @brief Returns a reference to the value, default-constructing it first if currently None.
+         *        Available only when `T` is non-void and default-initializable.
+         *
+         * @return reference to the stored value
+         */
+        StoredT &get_or_insert_default()
+            requires(!std::is_void_v<T>) && std::default_initializable<StoredT>
+        {
+            if (!has_value_)
+            {
+                ::new (static_cast<void *>(std::addressof(value_))) StoredT{};
+                has_value_ = true;
+            }
+            return value_;
+        }
+
+        /**
+         * @brief Returns a reference to the value, calling @p f to produce it if currently None.
+         *        Available only when `T` is non-void.
+         *
+         * @tparam F nullary callable returning a value convertible to `StoredT`
+         * @param f the fallback producer
+         * @return reference to the stored value
+         */
+        template <typename F>
+            requires(!std::is_void_v<T>) && std::invocable<F> &&
+                    std::convertible_to<std::invoke_result_t<F>, StoredT>
+        StoredT &get_or_insert_with(F &&f)
+        {
+            if (!has_value_)
+            {
+                ::new (static_cast<void *>(std::addressof(value_))) StoredT(static_cast<StoredT>(std::invoke(f)));
+                has_value_ = true;
+            }
+            return value_;
+        }
+
     public:
         /**
          * @brief Converts to `Result<T, E>`: Some becomes `Ok`, None becomes `Err(e)`.
