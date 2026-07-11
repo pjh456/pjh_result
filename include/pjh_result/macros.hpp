@@ -1,3 +1,7 @@
+/**
+ * @file macros.hpp
+ * @brief Rust `?`-style error-propagation macros for `Result`.
+ */
 #ifndef INCLUDE_PJH_RESULT_MACROS_HPP
 #define INCLUDE_PJH_RESULT_MACROS_HPP
 
@@ -10,10 +14,13 @@
 #define RESULT_UNIQUE_VAR(prefix) RESULT_CONCAT(prefix, __LINE__)
 
 /**
- * @brief 仿 Rust `?` 运算符 (针对带返回值的 Result<T, E>)
+ * @brief Rust `?`-operator analogue for a value-carrying `Result<T, E>`.
  *
- * 作用：执行 expr，如果返回 Ok(v)，则声明 auto var_name = v；
- *      如果返回 Err(e)，则当前函数立即 return 错误。
+ * Evaluates @p expr: if it is `Ok(v)`, declares `auto var_name = v`; if it is `Err(e)`,
+ * the enclosing function immediately returns the error.
+ *
+ * @param var_name name bound to the unwrapped success value
+ * @param expr an expression producing a `Result`
  */
 #define ASSIGN_OR_RETURN(var_name, expr)                                                        \
     auto RESULT_UNIQUE_VAR(_res_) = (expr);                                                     \
@@ -24,9 +31,12 @@
     auto var_name = std::move(RESULT_UNIQUE_VAR(_res_).unwrap())
 
 /**
- * @brief 仿 Rust `?` 运算符 (针对无返回值的 Result<void, E>)
+ * @brief Rust `?`-operator analogue for a valueless `Result<void, E>`.
  *
- * 作用：执行 expr，如果是 Ok 则继续往下走；如果是 Err，则当前函数立即 return 错误。
+ * Evaluates @p expr: if it is `Ok`, execution continues; if it is `Err(e)`, the enclosing
+ * function immediately returns the error.
+ *
+ * @param expr an expression producing a `Result`
  */
 #define TRY(expr)                                                                                   \
     do                                                                                              \

@@ -1,3 +1,7 @@
+/**
+ * @file result.hpp
+ * @brief Rust-style `Result<T, E>` monad backed by hand-written tagged-union storage.
+ */
 #ifndef INCLUDE_PJH_RESULT_RESULT_HPP
 #define INCLUDE_PJH_RESULT_RESULT_HPP
 
@@ -14,21 +18,22 @@ namespace pjh::result
 {
     namespace utils
     {
-        /// @brief void 结果的占位类型：T = void 时成功分支存储它。
+        /// @brief Placeholder type for the success branch when `T = void`.
         struct Unit
         {
         };
 
         namespace detail
         {
-            /// @brief 标记 Result 当前存储的是哪一路（成功值或错误值）。
+            /// @brief Discriminator marking which alternative (Ok or Err) is currently active.
             enum class Tag : unsigned char
             {
                 Ok,
                 Err
             };
 
-            /// @brief map 的结果类型：T = void 时用 f()，否则用 f(T)。惰性求值以避免 void 实参。
+            /// @brief Result type of `map`: `f()` when `T = void`, otherwise `f(T)`.
+            ///        Evaluated lazily to avoid forming a `void` argument.
             template <typename F, typename T, bool = std::is_void_v<T>>
             struct map_result
             {
@@ -42,7 +47,7 @@ namespace pjh::result
             template <typename F, typename T>
             using map_result_t = typename map_result<F, T>::type;
 
-            /// @brief and_then(const &) 的结果类型：T = void 时用 f()，否则用 f(const T&)。
+            /// @brief Result type of `and_then(const &)`: `f()` when `T = void`, otherwise `f(const T&)`.
             template <typename F, typename T, bool = std::is_void_v<T>>
             struct cref_result
             {
@@ -56,7 +61,7 @@ namespace pjh::result
             template <typename F, typename T>
             using cref_result_t = typename cref_result<F, T>::type;
 
-            /// @brief and_then(&&) 的结果类型：T = void 时用 f()，否则用 f(T)。
+            /// @brief Result type of `and_then(&&)`: `f()` when `T = void`, otherwise `f(T)`.
             template <typename F, typename T, bool = std::is_void_v<T>>
             struct value_result
             {
@@ -70,18 +75,18 @@ namespace pjh::result
             template <typename F, typename T>
             using value_result_t = typename value_result<F, T>::type;
 
-            /// @brief f 是否可作用于成功值：T = void 要求 f() 可调用，否则 f(T)。
+            /// @brief Whether `f` is callable on the success value: requires `f()` when `T = void`, else `f(T)`.
             template <typename F, typename T>
             concept MapCallable = (std::is_void_v<T> && std::invocable<F>) ||
                                   (!std::is_void_v<T> && std::invocable<F, T>);
 
-            /// @brief f 作用于 const 成功值后是否返回 Result。
+            /// @brief Whether `f` applied to the const success value returns a `Result`.
             template <typename F, typename T>
             concept CrefResultFn =
                 (std::is_void_v<T> && result_helper::ResultType<std::invoke_result_t<F>>) ||
                 (!std::is_void_v<T> && result_helper::ResultType<std::invoke_result_t<F, const T &>>);
 
-            /// @brief f 作用于成功值（移动）后是否返回 Result。
+            /// @brief Whether `f` applied to the (moved) success value returns a `Result`.
             template <typename F, typename T>
             concept ValueResultFn =
                 (std::is_void_v<T> && result_helper::ResultType<std::invoke_result_t<F>>) ||
@@ -89,9 +94,10 @@ namespace pjh::result
         }
 
         /**
-         * @brief 用于在宏中擦除 T 类型，触发 Result 的隐式转换并自动构建 Err 状态。
+         * @brief Type-erases `T` in the propagation macros so that a value implicitly
+         *        converts into a `Result` in the Err state.
          *
-         * @tparam E 错误值类型
+         * @tparam E error value type
          */
         template <typename E>
         struct Failure
@@ -99,30 +105,34 @@ namespace pjh::result
             E error;
         };
 
-        /// @brief 推导指引：允许直接写 `Failure{err}` 而无需 `Failure<E>{err}`。
+        /// @brief Deduction guide: allows writing `Failure{err}` instead of `Failure<E>{err}`.
         template <typename E>
         Failure(E) -> Failure<E>;
 
         /**
-         * @brief 结果封装类 (Monad)。
+         * @brief A result monad.
          *
-         * 提供类似 Rust 的 `Result<T, E>` 机制，强制调用者处理错误。
-         * 它要么包含一个成功的值 T，要么包含一个错误 E，二者必居其一。
+         * A Rust-like `Result<T, E>` that forces the caller to handle errors. It holds
+         * either a success value `T` or an error `E` — exactly one of the two.
          *
-         * 内部使用手写的带标签联合体（tagged union）存储，不依赖 `std::variant`：
-         * - 无 `valueless_by_exception` 之类的“第三态”，`is_ok()`/`is_err()` 恒互补；
-         * - 访问不经 `std::get` 的运行时校验，直接读取活跃成员。
+         * Storage is a hand-written tagged union rather than `std::variant`:
+         * - there is no "third state" such as `valueless_by_exception`; `is_ok()` and
+         *   `is_err()` are always complementary;
+         * - access does not go through `std::get`'s runtime check — the active member is
+         *   read directly.
          *
-         * 支持 `T = void`：此时成功分支不携带值，`Ok()` 无参构造，`unwrap()` 返回 void，
-         * 且不提供 `unwrap_or`。
+         * `T = void` is supported: the success branch carries no value, `Ok()` takes no
+         * argument, `unwrap()` returns `void`, and `unwrap_or` is not provided.
          *
-         * @tparam T 成功时的数据类型（可为 void）
-         * @tparam E 失败时的错误类型
+         * @tparam T success value type (may be `void`)
+         * @tparam E error value type
          *
-         * @pre T（非 void 时）与 E 的移动构造必须为 `noexcept`（见类内 static_assert）。
-         *      这样赋值可实现为“析构旧值 + 无异常地移动构造新值”，保证对象永不进入无效状态。
-         * @note 禁止忽略返回值 ([[nodiscard]])。
-         * @note 禁止 T 与 E 为同一类型。
+         * @pre The move constructor of `T` (when non-void) and of `E` must be `noexcept`
+         *      (enforced by the in-class `static_assert`). This lets assignment be
+         *      implemented as "destroy the old value, then nothrow move-construct the new
+         *      one", guaranteeing the object never enters an invalid state.
+         * @note The return value must not be ignored (`[[nodiscard]]`).
+         * @note `T` and `E` must not be the same type.
          */
         template <typename T, typename E>
             requires result_helper::ValidResultTypes<T, E> &&
@@ -131,13 +141,13 @@ namespace pjh::result
         class [[nodiscard]] Result
         {
         private:
-            /// @brief 成功分支的实际存储类型：T = void 时退化为 Unit。
+            /// @brief Actual storage type of the success branch; degrades to `Unit` when `T = void`.
             using OkT = std::conditional_t<std::is_void_v<T>, Unit, T>;
 
             static_assert(std::is_nothrow_move_constructible_v<OkT>,
-                          "pjh::result::Result 要求 T 的移动构造为 noexcept");
+                          "pjh::result::Result requires T to be nothrow move constructible");
             static_assert(std::is_nothrow_move_constructible_v<E>,
-                          "pjh::result::Result 要求 E 的移动构造为 noexcept");
+                          "pjh::result::Result requires E to be nothrow move constructible");
 
             detail::Tag tag_;
             union
@@ -153,7 +163,8 @@ namespace pjh::result
             {
             };
 
-            /// @brief 就地构造 Ok 分支（成功值由 a... 转发构造，无实参时值初始化）。
+            /// @brief In-place constructs the Ok branch (success value forwarded from `a...`,
+            ///        value-initialized when no argument is given).
             template <typename... A>
                 requires std::constructible_from<OkT, A &&...>
             explicit Result(ok_t, A &&...a) noexcept(std::is_nothrow_constructible_v<OkT, A &&...>)
@@ -161,7 +172,7 @@ namespace pjh::result
             {
             }
 
-            /// @brief 就地构造 Err 分支（错误值由 a... 转发构造）。
+            /// @brief In-place constructs the Err branch (error forwarded from `a...`).
             template <typename... A>
                 requires std::constructible_from<E, A &&...>
             explicit Result(err_t, A &&...a) noexcept(std::is_nothrow_constructible_v<E, A &&...>)
@@ -169,7 +180,7 @@ namespace pjh::result
             {
             }
 
-            /// @brief 析构当前活跃成员；平凡可析构类型下为空操作。
+            /// @brief Destroys the currently active member; a no-op for trivially destructible types.
             void destroy_() noexcept
             {
                 if (tag_ == detail::Tag::Ok)
@@ -184,7 +195,8 @@ namespace pjh::result
                 }
             }
 
-            /// @brief 从右值 Result 无异常地移动构造本对象的活跃成员（假定本对象存储为空/已析构）。
+            /// @brief Nothrow move-constructs this object's active member from an rvalue `Result`
+            ///        (assumes this object's storage is empty / already destroyed).
             void construct_from_(Result &&o) noexcept
             {
                 tag_ = o.tag_;
@@ -196,11 +208,11 @@ namespace pjh::result
 
         public:
             /**
-             * @brief 构造成功结果 Ok(val)。仅当 T 非 void 时可用。
+             * @brief Constructs a success result `Ok(val)`. Available only when `T` is non-void.
              *
-             * @tparam U 用于构造 T 的实参类型
-             * @param val 成功值
-             * @return Result 处于 Ok 状态的结果
+             * @tparam U argument type used to construct `T`
+             * @param val the success value
+             * @return a `Result` in the Ok state
              */
             template <typename U>
                 requires(!std::is_void_v<T>) && std::constructible_from<OkT, U &&>
@@ -210,9 +222,9 @@ namespace pjh::result
             }
 
             /**
-             * @brief 构造成功结果 Ok()。仅当 T 为 void 时可用。
+             * @brief Constructs a success result `Ok()`. Available only when `T` is `void`.
              *
-             * @return Result 处于 Ok 状态的结果
+             * @return a `Result` in the Ok state
              */
             static Result Ok() noexcept
                 requires std::is_void_v<T>
@@ -221,11 +233,11 @@ namespace pjh::result
             }
 
             /**
-             * @brief 构造错误结果 Err(err)。
+             * @brief Constructs an error result `Err(err)`.
              *
-             * @tparam G 用于构造 E 的实参类型
-             * @param err 错误值
-             * @return Result 处于 Err 状态的结果
+             * @tparam G argument type used to construct `E`
+             * @param err the error value
+             * @return a `Result` in the Err state
              */
             template <typename G>
                 requires std::constructible_from<E, G &&>
@@ -235,7 +247,7 @@ namespace pjh::result
             }
 
         public:
-            /// @brief 拷贝构造：复制对方的活跃成员。
+            /// @brief Copy constructor: copies the other object's active member.
             Result(const Result &o)
                 requires std::copy_constructible<OkT> && std::copy_constructible<E>
                 : tag_(o.tag_)
@@ -246,7 +258,7 @@ namespace pjh::result
                     ::new (static_cast<void *>(std::addressof(err_))) E(o.err_);
             }
 
-            /// @brief 移动构造：无异常地移动对方的活跃成员。
+            /// @brief Move constructor: nothrow-moves the other object's active member.
             Result(Result &&o) noexcept : tag_(o.tag_)
             {
                 if (tag_ == detail::Tag::Ok)
@@ -256,10 +268,11 @@ namespace pjh::result
             }
 
             /**
-             * @brief 拷贝赋值（强异常保证）。
+             * @brief Copy assignment (strong exception guarantee).
              *
-             * 先拷贝构造临时对象（此步若抛出，`*this` 保持不变），再析构旧值并无异常地移动构造。
-             * 因此本对象永不进入无效状态。
+             * First copy-constructs a temporary (if this step throws, `*this` is left
+             * unchanged), then destroys the old value and nothrow move-constructs from the
+             * temporary. Hence the object never enters an invalid state.
              */
             Result &operator=(const Result &o)
                 requires std::copy_constructible<OkT> && std::copy_constructible<E>
@@ -273,7 +286,7 @@ namespace pjh::result
                 return *this;
             }
 
-            /// @brief 移动赋值：析构旧值后无异常地移动构造。
+            /// @brief Move assignment: destroys the old value, then nothrow move-constructs.
             Result &operator=(Result &&o) noexcept
             {
                 if (this != std::addressof(o))
@@ -284,14 +297,14 @@ namespace pjh::result
                 return *this;
             }
 
-            /// @brief 析构：销毁当前活跃成员。
+            /// @brief Destructor: destroys the currently active member.
             ~Result() { destroy_(); }
 
             /**
-             * @brief 由 Failure 隐式构造 Err 结果（拷贝错误）。
+             * @brief Implicitly constructs an Err result from a `Failure` (copying the error).
              *
-             * @tparam G Failure 携带的错误类型
-             * @param f 错误载体
+             * @tparam G error type carried by the `Failure`
+             * @param f the error carrier
              */
             template <typename G>
                 requires std::constructible_from<E, const G &>
@@ -301,10 +314,10 @@ namespace pjh::result
             }
 
             /**
-             * @brief 由 Failure 隐式构造 Err 结果（移动错误）。
+             * @brief Implicitly constructs an Err result from a `Failure` (moving the error).
              *
-             * @tparam G Failure 携带的错误类型
-             * @param f 错误载体
+             * @tparam G error type carried by the `Failure`
+             * @param f the error carrier
              */
             template <typename G>
                 requires std::constructible_from<E, G &&>
@@ -314,17 +327,17 @@ namespace pjh::result
             }
 
         public:
-            /// @brief 当前是否为 Ok 状态。
+            /// @brief Whether the result is currently in the Ok state.
             bool is_ok() const noexcept { return tag_ == detail::Tag::Ok; }
-            /// @brief 当前是否为 Err 状态。
+            /// @brief Whether the result is currently in the Err state.
             bool is_err() const noexcept { return tag_ == detail::Tag::Err; }
 
         public:
             /**
-             * @brief 解包成功值；若为 Err 则抛出异常。仅当 T 非 void 时可用。
+             * @brief Unwraps the success value; throws if Err. Available only when `T` is non-void.
              *
-             * @throws result_helper::bad_result_access 当前处于 Err 状态
-             * @return T& 内部成功值的引用
+             * @throws result_helper::bad_result_access when currently in the Err state
+             * @return reference to the inner success value
              */
             [[nodiscard]] OkT &unwrap() &
                 requires(!std::is_void_v<T>)
@@ -335,10 +348,10 @@ namespace pjh::result
             }
 
             /**
-             * @brief 解包成功值；若为 Err 则抛出异常。仅当 T 非 void 时可用。
+             * @brief Unwraps the success value; throws if Err. Available only when `T` is non-void.
              *
-             * @throws result_helper::bad_result_access 当前处于 Err 状态
-             * @return const T& 内部成功值的常量引用
+             * @throws result_helper::bad_result_access when currently in the Err state
+             * @return const reference to the inner success value
              */
             [[nodiscard]] const OkT &unwrap() const &
                 requires(!std::is_void_v<T>)
@@ -349,10 +362,11 @@ namespace pjh::result
             }
 
             /**
-             * @brief 解包并移出成功值；若为 Err 则抛出异常。仅当 T 非 void 时可用。
+             * @brief Unwraps and moves out the success value; throws if Err. Available only when
+             *        `T` is non-void.
              *
-             * @throws result_helper::bad_result_access 当前处于 Err 状态
-             * @return T 移动得到的成功值
+             * @throws result_helper::bad_result_access when currently in the Err state
+             * @return the moved-out success value
              */
             [[nodiscard]] OkT unwrap() &&
                 requires(!std::is_void_v<T>)
@@ -363,9 +377,9 @@ namespace pjh::result
             }
 
             /**
-             * @brief 断言当前为 Ok；若为 Err 则抛出异常。仅当 T 为 void 时可用。
+             * @brief Asserts the state is Ok; throws if Err. Available only when `T` is `void`.
              *
-             * @throws result_helper::bad_result_access 当前处于 Err 状态
+             * @throws result_helper::bad_result_access when currently in the Err state
              */
             void unwrap() const
                 requires std::is_void_v<T>
@@ -375,10 +389,11 @@ namespace pjh::result
             }
 
             /**
-             * @brief 解包成功值；若为 Err 则返回给定默认值。仅当 T 非 void 时可用。
+             * @brief Unwraps the success value, or returns the given default if Err.
+             *        Available only when `T` is non-void.
              *
-             * @param val Err 时返回的默认值
-             * @return T 成功值或默认值
+             * @param val the default returned when in the Err state
+             * @return the success value, or @p val
              */
             [[nodiscard]] OkT unwrap_or(OkT val) const
                 requires(!std::is_void_v<T>)
@@ -387,10 +402,10 @@ namespace pjh::result
             }
 
             /**
-             * @brief 解包错误值；若为 Ok 则抛出异常。
+             * @brief Unwraps the error value; throws if Ok.
              *
-             * @throws result_helper::bad_result_access 当前处于 Ok 状态
-             * @return E& 内部错误值的引用
+             * @throws result_helper::bad_result_access when currently in the Ok state
+             * @return reference to the inner error value
              */
             [[nodiscard]] E &unwrap_err() &
             {
@@ -400,10 +415,10 @@ namespace pjh::result
             }
 
             /**
-             * @brief 解包错误值；若为 Ok 则抛出异常。
+             * @brief Unwraps the error value; throws if Ok.
              *
-             * @throws result_helper::bad_result_access 当前处于 Ok 状态
-             * @return const E& 内部错误值的常量引用
+             * @throws result_helper::bad_result_access when currently in the Ok state
+             * @return const reference to the inner error value
              */
             [[nodiscard]] const E &unwrap_err() const &
             {
@@ -413,10 +428,10 @@ namespace pjh::result
             }
 
             /**
-             * @brief 解包并移出错误值；若为 Ok 则抛出异常。
+             * @brief Unwraps and moves out the error value; throws if Ok.
              *
-             * @throws result_helper::bad_result_access 当前处于 Ok 状态
-             * @return E 移动得到的错误值
+             * @throws result_helper::bad_result_access when currently in the Ok state
+             * @return the moved-out error value
              */
             [[nodiscard]] E unwrap_err() &&
             {
@@ -426,10 +441,10 @@ namespace pjh::result
             }
 
             /**
-             * @brief 解包错误值；若为 Ok 则返回给定默认值。
+             * @brief Unwraps the error value, or returns the given default if Ok.
              *
-             * @param err Ok 时返回的默认值
-             * @return E 错误值或默认值
+             * @param err the default returned when in the Ok state
+             * @return the error value, or @p err
              */
             [[nodiscard]] E unwrap_err_or(E err) const
             {
@@ -438,13 +453,14 @@ namespace pjh::result
 
         public:
             /**
-             * @brief 转换成功值 (Map)。
+             * @brief Transforms the success value (Map).
              *
-             * Ok 时对成功值应用 f（T = void 时调用 f()），返回 Ok(f(...))；Err(e) 时原样返回 Err(e)。
+             * On Ok, applies `f` to the success value (calls `f()` when `T = void`) and returns
+             * `Ok(f(...))`; on Err(e), returns `Err(e)` unchanged.
              *
-             * @tparam F 转换函数类型
-             * @param f 作用于成功值、返回 U 的可调用对象
-             * @return Result<U, E> 新的结果类型
+             * @tparam F the transform callable
+             * @param f callable applied to the success value, returning `U`
+             * @return `Result<U, E>`
              */
             template <typename F>
                 requires detail::MapCallable<F, T>
@@ -478,13 +494,13 @@ namespace pjh::result
             }
 
             /**
-             * @brief 转换错误值 (Map_Err)。
+             * @brief Transforms the error value (MapErr).
              *
-             * Err(e) 时返回 Err(f(e))；Ok 时原样返回 Ok（T = void 时为 Ok()）。
+             * On Err(e), returns `Err(f(e))`; on Ok, returns `Ok` unchanged (`Ok()` when `T = void`).
              *
-             * @tparam F 转换函数类型
-             * @param f 接受 E、返回 G 的可调用对象
-             * @return Result<T, G> 新的结果类型
+             * @tparam F the transform callable
+             * @param f callable taking `E` and returning `G`
+             * @return `Result<T, G>`
              */
             template <typename F>
                 requires std::invocable<F, E>
@@ -508,14 +524,14 @@ namespace pjh::result
 
         public:
             /**
-             * @brief 链式调用 (FlatMap / AndThen)。
+             * @brief Chains a fallible operation (FlatMap / AndThen).
              *
-             * Ok 时调用 f（T = void 时 f()，否则 f(成功值)，f 必须返回一个 Result）；
-             * Err(e) 时短路返回 Err(e)。
+             * On Ok, invokes `f` (`f()` when `T = void`, otherwise `f(success value)`; `f` must
+             * return a `Result`); on Err(e), short-circuits and returns `Err(e)`.
              *
-             * @tparam F 返回 Result 的可调用对象
-             * @param f 后续操作
-             * @return f 的返回类型（一个 Result）
+             * @tparam F callable returning a `Result`
+             * @param f the follow-up operation
+             * @return the return type of `f` (a `Result`)
              */
             template <typename F>
                 requires detail::CrefResultFn<F, T>
@@ -534,11 +550,11 @@ namespace pjh::result
             }
 
             /**
-             * @brief 链式调用 (FlatMap / AndThen)，移动语义版本。
+             * @brief Chains a fallible operation (FlatMap / AndThen), rvalue/move overload.
              *
-             * @tparam F 返回 Result 的可调用对象
-             * @param f 后续操作
-             * @return f 的返回类型（一个 Result）
+             * @tparam F callable returning a `Result`
+             * @param f the follow-up operation
+             * @return the return type of `f` (a `Result`)
              */
             template <typename F>
                 requires detail::ValueResultFn<F, T>
@@ -559,6 +575,7 @@ namespace pjh::result
 
         namespace result_helper
         {
+            /// @brief Trait specialization exposing the value/error types of a `Result`.
             template <typename T, typename E>
             struct result_traits<Result<T, E>>
             {
