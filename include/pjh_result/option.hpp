@@ -708,6 +708,50 @@ namespace pjh::result
             }
             return value_;
         }
+
+    public:
+        /**
+         * @brief Converts to `Result<T, E>`: Some becomes `Ok`, None becomes `Err(e)`.
+         *
+         * @tparam E the error type
+         * @param err the error value used when None
+         * @return `Result<T, E>`
+         */
+        template <typename E>
+            requires std::constructible_from<E, const E &>
+        [[nodiscard]] Result<T, E> ok_or(E err) const
+        {
+            if (has_value_)
+            {
+                if constexpr (std::is_void_v<T>)
+                    return Result<void, E>::Ok();
+                else
+                    return Result<T, E>::Ok(value_);
+            }
+            return Result<T, E>::Err(std::move(err));
+        }
+
+        /**
+         * @brief Converts to `Result<T, E>`: Some becomes `Ok`, None invokes `f()` to produce `Err`.
+         *
+         * @tparam F nullary callable returning `E`
+         * @param f the error producer invoked when None
+         * @return `Result<T, E>`
+         */
+        template <typename F>
+            requires std::invocable<F>
+        [[nodiscard]] auto ok_or_else(F &&f) const -> Result<T, std::invoke_result_t<F>>
+        {
+            using E = std::invoke_result_t<F>;
+            if (has_value_)
+            {
+                if constexpr (std::is_void_v<T>)
+                    return Result<void, E>::Ok();
+                else
+                    return Result<T, E>::Ok(value_);
+            }
+            return Result<T, E>::Err(std::invoke(f));
+        }
     };
 }
 
