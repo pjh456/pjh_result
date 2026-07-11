@@ -245,3 +245,51 @@ TEST_CASE("operator== throws on moved Result")
     std::move(b).unwrap();
     CHECK_THROWS_AS((void)(a == b), bad_access);
 }
+
+TEST_CASE("flatten collapses nested Result")
+{
+    auto inner = res::Result<int, std::string>::Ok(42);
+    auto outer = res::Result<
+        res::Result<int, std::string>,
+        std::string>::Ok(std::move(inner));
+    auto flat = outer.flatten();
+    CHECK(flat.is_ok());
+    CHECK(flat.unwrap() == 42);
+}
+
+TEST_CASE("flatten on Err propagates")
+{
+    auto outer = res::Result<
+        res::Result<int, std::string>,
+        std::string>::Err(std::string("e"));
+    auto flat = outer.flatten();
+    CHECK(flat.is_err());
+    CHECK(flat.unwrap_err() == "e");
+}
+
+TEST_CASE("flatten rvalue moves inner Result")
+{
+    auto inner = res::Result<
+        std::unique_ptr<int>,
+        std::string>::Ok(std::unique_ptr<int>(new int(7)));
+    auto outer = res::Result<
+        res::Result<
+            std::unique_ptr<int>,
+            std::string>,
+        std::string>::Ok(std::move(inner));
+    auto flat = std::move(outer).flatten();
+    CHECK(flat.is_ok());
+    CHECK(*flat.unwrap() == 7);
+}
+
+TEST_CASE("flatten rvalue on Err propagates")
+{
+    auto outer = res::Result<
+        res::Result<
+            int,
+            std::string>,
+        std::string>::Err(std::string("e"));
+    auto flat = std::move(outer).flatten();
+    CHECK(flat.is_err());
+    CHECK(flat.unwrap_err() == "e");
+}

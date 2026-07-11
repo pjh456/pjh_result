@@ -138,7 +138,6 @@ namespace pjh::result
      */
     template <typename T, typename E>
         requires detail::ValidResultTypes<T, E> &&
-                 detail::NotResult<T> &&
                  detail::NotResult<E>
     class [[nodiscard]] Result
     {
@@ -923,6 +922,49 @@ namespace pjh::result
                 return Ret::Ok(std::move(ok_));
         }
 
+        /**
+         * @brief Flattens one level of nesting.
+         *
+         * On `Ok(inner)`, returns `inner`; on `Err(e)`, returns `Err(e)`.
+         * Available only when the success type is itself a `Result<U, E>` with the
+         * same error type.
+         *
+         * @tparam U Result value type (inferred from T being a Result)
+         * @return the flattened `Result<U, E>`
+         */
+        template <typename U = T>
+            requires detail::ResultType<U> &&
+                     std::same_as<detail::result_error_t<U>, E>
+        [[nodiscard]] auto flatten() const & -> Result<detail::result_value_t<U>, E>
+        {
+            if (is_ok())
+            {
+                if constexpr (std::is_void_v<detail::result_value_t<U>>)
+                    return Result<void, E>::Ok();
+                else
+                    return ok_;
+            }
+            return Result<detail::result_value_t<U>, E>::Err(err_);
+        }
+
+        /// @overload
+        template <typename U = T>
+            requires detail::ResultType<U> &&
+                     std::same_as<detail::result_error_t<U>, E>
+        [[nodiscard]] auto flatten()
+            && -> Result<detail::result_value_t<U>, E>
+        {
+            if (is_ok())
+            {
+                auto inner = std::move(ok_);
+                tag_ = detail::Tag::Moved;
+                return inner;
+            }
+            auto e = std::move(err_);
+            tag_ = detail::Tag::Moved;
+            return Result<detail::result_value_t<U>, E>::Err(std::move(e));
+        }
+
     public:
         /**
          * @brief Equality comparison.
@@ -940,7 +982,7 @@ namespace pjh::result
          */
         friend bool operator==(const Result &a, const Result &b)
             requires(std::is_void_v<T> || std::equality_comparable<OkT>) &&
-                        std::equality_comparable<E>
+                    std::equality_comparable<E>
         {
             if (a.tag_ == detail::Tag::Moved || b.tag_ == detail::Tag::Moved)
                 throw bad_result_access("Result comparison after move");

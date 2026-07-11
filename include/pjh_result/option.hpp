@@ -194,6 +194,9 @@ namespace pjh::result
         ~Option() { destroy_(); }
 
     public:
+        /// @brief The value type (useful for metaprogramming).
+        using value_type = T;
+
         /// @brief Whether the option currently holds a value.
         bool is_some() const noexcept { return has_value_; }
         /// @brief Whether the option is currently empty.
@@ -645,6 +648,37 @@ namespace pjh::result
                 }
             }
             return Option::None();
+        }
+
+        /**
+         * @brief Flattens one level of nesting.
+         *
+         * On `Some(inner)`, returns `inner`; on `None`, returns `None`.
+         * Available only when the value type is itself an `Option<U>`.
+         *
+         * @tparam U Option value type (inferred from T)
+         * @return `Option<U>` with the inner value
+         */
+        template <typename U = T>
+            requires detail::OptionType<U>
+        [[nodiscard]] auto flatten() const & -> Option<typename U::value_type>
+        {
+            if (!has_value_)
+                return Option<typename U::value_type>::None();
+            return value_;
+        }
+
+        /// @overload
+        template <typename U = T>
+            requires detail::OptionType<U>
+        [[nodiscard]] auto flatten()
+            && -> Option<typename U::value_type>
+        {
+            if (!has_value_)
+                return Option<typename U::value_type>::None();
+            auto inner = std::move(value_);
+            has_value_ = false;
+            return inner;
         }
 
     public:

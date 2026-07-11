@@ -123,3 +123,42 @@ TEST_CASE("filter rvalue works with move-only type")
     auto none = std::move(empty).filter([](const std::unique_ptr<int> &) { return true; });
     CHECK(none.is_none());
 }
+
+TEST_CASE("flatten collapses nested Option")
+{
+    auto inner = res::Option<int>::Some(42);
+    auto outer = res::Option<res::Option<int>>::Some(std::move(inner));
+    auto flat = outer.flatten();
+    CHECK(flat.is_some());
+    CHECK(flat.unwrap() == 42);
+}
+
+TEST_CASE("flatten on None returns None")
+{
+    auto outer = res::Option<res::Option<int>>::None();
+    auto flat = outer.flatten();
+    CHECK(flat.is_none());
+}
+
+TEST_CASE("flatten on Some(None) returns None")
+{
+    auto outer = res::Option<res::Option<int>>::Some(res::Option<int>::None());
+    auto flat = outer.flatten();
+    CHECK(flat.is_none());
+}
+
+TEST_CASE("flatten rvalue moves inner Option")
+{
+    auto outer = res::Option<res::Option<std::unique_ptr<int>>>::Some(
+        res::Option<std::unique_ptr<int>>::Some(std::unique_ptr<int>(new int(7))));
+    auto flat = std::move(outer).flatten();
+    CHECK(flat.is_some());
+    CHECK(*flat.unwrap() == 7);
+}
+
+TEST_CASE("flatten rvalue on None returns None")
+{
+    auto outer = res::Option<res::Option<int>>::None();
+    auto flat = std::move(outer).flatten();
+    CHECK(flat.is_none());
+}
