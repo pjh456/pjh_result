@@ -6,7 +6,6 @@
 #include <new>
 #include <type_traits>
 #include <utility>
-#include <variant> // 仅 Result<void, E> 特化暂用，Step 2 移除
 
 #include "pjh_result/detail/traits.hpp"
 #include "pjh_result/errors.hpp"
@@ -15,7 +14,7 @@ namespace pjh::result
 {
     namespace utils
     {
-        /// @brief void 结果的占位类型（Step 2 起用于统一 T = void）。
+        /// @brief void 结果的占位类型：T = void 时成功分支存储它。
         struct Unit
         {
         };
@@ -28,6 +27,65 @@ namespace pjh::result
                 Ok,
                 Err
             };
+
+            /// @brief map 的结果类型：T = void 时用 f()，否则用 f(T)。惰性求值以避免 void 实参。
+            template <typename F, typename T, bool = std::is_void_v<T>>
+            struct map_result
+            {
+                using type = std::invoke_result_t<F, T>;
+            };
+            template <typename F, typename T>
+            struct map_result<F, T, true>
+            {
+                using type = std::invoke_result_t<F>;
+            };
+            template <typename F, typename T>
+            using map_result_t = typename map_result<F, T>::type;
+
+            /// @brief and_then(const &) 的结果类型：T = void 时用 f()，否则用 f(const T&)。
+            template <typename F, typename T, bool = std::is_void_v<T>>
+            struct cref_result
+            {
+                using type = std::invoke_result_t<F, const T &>;
+            };
+            template <typename F, typename T>
+            struct cref_result<F, T, true>
+            {
+                using type = std::invoke_result_t<F>;
+            };
+            template <typename F, typename T>
+            using cref_result_t = typename cref_result<F, T>::type;
+
+            /// @brief and_then(&&) 的结果类型：T = void 时用 f()，否则用 f(T)。
+            template <typename F, typename T, bool = std::is_void_v<T>>
+            struct value_result
+            {
+                using type = std::invoke_result_t<F, T>;
+            };
+            template <typename F, typename T>
+            struct value_result<F, T, true>
+            {
+                using type = std::invoke_result_t<F>;
+            };
+            template <typename F, typename T>
+            using value_result_t = typename value_result<F, T>::type;
+
+            /// @brief f 是否可作用于成功值：T = void 要求 f() 可调用，否则 f(T)。
+            template <typename F, typename T>
+            concept MapCallable = (std::is_void_v<T> && std::invocable<F>) ||
+                                  (!std::is_void_v<T> && std::invocable<F, T>);
+
+            /// @brief f 作用于 const 成功值后是否返回 Result。
+            template <typename F, typename T>
+            concept CrefResultFn =
+                (std::is_void_v<T> && result_helper::ResultType<std::invoke_result_t<F>>) ||
+                (!std::is_void_v<T> && result_helper::ResultType<std::invoke_result_t<F, const T &>>);
+
+            /// @brief f 作用于成功值（移动）后是否返回 Result。
+            template <typename F, typename T>
+            concept ValueResultFn =
+                (std::is_void_v<T> && result_helper::ResultType<std::invoke_result_t<F>>) ||
+                (!std::is_void_v<T> && result_helper::ResultType<std::invoke_result_t<F, T>>);
         }
 
         /**
@@ -55,11 +113,14 @@ namespace pjh::result
          * - 无 `valueless_by_exception` 之类的“第三态”，`is_ok()`/`is_err()` 恒互补；
          * - 访问不经 `std::get` 的运行时校验，直接读取活跃成员。
          *
-         * @tparam T 成功时的数据类型
+         * 支持 `T = void`：此时成功分支不携带值，`Ok()` 无参构造，`unwrap()` 返回 void，
+         * 且不提供 `unwrap_or`。
+         *
+         * @tparam T 成功时的数据类型（可为 void）
          * @tparam E 失败时的错误类型
          *
-         * @pre T 与 E 的移动构造必须为 `noexcept`（见类内 static_assert）。这样赋值可实现为
-         *      “析构旧值 + 无异常地移动构造新值”，从而保证对象永不进入无效状态。
+         * @pre T（非 void 时）与 E 的移动构造必须为 `noexcept`（见类内 static_assert）。
+         *      这样赋值可实现为“析构旧值 + 无异常地移动构造新值”，保证对象永不进入无效状态。
          * @note 禁止忽略返回值 ([[nodiscard]])。
          * @note 禁止 T 与 E 为同一类型。
          */
@@ -70,8 +131,8 @@ namespace pjh::result
         class [[nodiscard]] Result
         {
         private:
-            /// @brief 成功分支的存储类型（Step 2 起在 T = void 时退化为 Unit）。
-            using OkT = T;
+            /// @brief 成功分支的实际存储类型：T = void 时退化为 Unit。
+            using OkT = std::conditional_t<std::is_void_v<T>, Unit, T>;
 
             static_assert(std::is_nothrow_move_constructible_v<OkT>,
                           "pjh::result::Result 要求 T 的移动构造为 noexcept");
@@ -84,6 +145,29 @@ namespace pjh::result
                 OkT ok_;
                 E err_;
             };
+
+            struct ok_t
+            {
+            };
+            struct err_t
+            {
+            };
+
+            /// @brief 就地构造 Ok 分支（成功值由 a... 转发构造，无实参时值初始化）。
+            template <typename... A>
+                requires std::constructible_from<OkT, A &&...>
+            explicit Result(ok_t, A &&...a) noexcept(std::is_nothrow_constructible_v<OkT, A &&...>)
+                : tag_(detail::Tag::Ok), ok_(std::forward<A>(a)...)
+            {
+            }
+
+            /// @brief 就地构造 Err 分支（错误值由 a... 转发构造）。
+            template <typename... A>
+                requires std::constructible_from<E, A &&...>
+            explicit Result(err_t, A &&...a) noexcept(std::is_nothrow_constructible_v<E, A &&...>)
+                : tag_(detail::Tag::Err), err_(std::forward<A>(a)...)
+            {
+            }
 
             /// @brief 析构当前活跃成员；平凡可析构类型下为空操作。
             void destroy_() noexcept
@@ -112,18 +196,28 @@ namespace pjh::result
 
         public:
             /**
-             * @brief 构造成功结果 Ok(val)。
+             * @brief 构造成功结果 Ok(val)。仅当 T 非 void 时可用。
              *
              * @tparam U 用于构造 T 的实参类型
              * @param val 成功值
              * @return Result 处于 Ok 状态的结果
              */
             template <typename U>
-                requires std::constructible_from<T, U &&>
-            static Result Ok(U &&val) noexcept(
-                std::is_nothrow_constructible_v<T, U &&>)
+                requires(!std::is_void_v<T>) && std::constructible_from<OkT, U &&>
+            static Result Ok(U &&val) noexcept(std::is_nothrow_constructible_v<OkT, U &&>)
             {
-                return Result(T(std::forward<U>(val)));
+                return Result(ok_t{}, std::forward<U>(val));
+            }
+
+            /**
+             * @brief 构造成功结果 Ok()。仅当 T 为 void 时可用。
+             *
+             * @return Result 处于 Ok 状态的结果
+             */
+            static Result Ok() noexcept
+                requires std::is_void_v<T>
+            {
+                return Result(ok_t{});
             }
 
             /**
@@ -135,28 +229,15 @@ namespace pjh::result
              */
             template <typename G>
                 requires std::constructible_from<E, G &&>
-            static Result Err(G &&err) noexcept(
-                std::is_nothrow_constructible_v<E, G &&>)
+            static Result Err(G &&err) noexcept(std::is_nothrow_constructible_v<E, G &&>)
             {
-                return Result(E(std::forward<G>(err)));
+                return Result(err_t{}, std::forward<G>(err));
             }
 
         public:
-            /// @brief 由成功值拷贝构造 Ok 结果。
-            explicit Result(const T &val) : tag_(detail::Tag::Ok), ok_(val) {}
-            /// @brief 由错误值拷贝构造 Err 结果。
-            explicit Result(const E &err) : tag_(detail::Tag::Err), err_(err) {}
-
-            /// @brief 由成功值移动构造 Ok 结果。
-            explicit Result(T &&val) noexcept(std::is_nothrow_move_constructible_v<T>)
-                : tag_(detail::Tag::Ok), ok_(std::move(val)) {}
-            /// @brief 由错误值移动构造 Err 结果。
-            explicit Result(E &&err) noexcept(std::is_nothrow_move_constructible_v<E>)
-                : tag_(detail::Tag::Err), err_(std::move(err)) {}
-
             /// @brief 拷贝构造：复制对方的活跃成员。
             Result(const Result &o)
-                requires std::copy_constructible<T> && std::copy_constructible<E>
+                requires std::copy_constructible<OkT> && std::copy_constructible<E>
                 : tag_(o.tag_)
             {
                 if (tag_ == detail::Tag::Ok)
@@ -181,7 +262,7 @@ namespace pjh::result
              * 因此本对象永不进入无效状态。
              */
             Result &operator=(const Result &o)
-                requires std::copy_constructible<T> && std::copy_constructible<E>
+                requires std::copy_constructible<OkT> && std::copy_constructible<E>
             {
                 if (this != std::addressof(o))
                 {
@@ -214,8 +295,7 @@ namespace pjh::result
              */
             template <typename G>
                 requires std::constructible_from<E, const G &>
-            Result(const Failure<G> &f) noexcept(
-                std::is_nothrow_constructible_v<E, const G &>)
+            Result(const Failure<G> &f) noexcept(std::is_nothrow_constructible_v<E, const G &>)
                 : tag_(detail::Tag::Err), err_(f.error)
             {
             }
@@ -228,8 +308,7 @@ namespace pjh::result
              */
             template <typename G>
                 requires std::constructible_from<E, G &&>
-            Result(Failure<G> &&f) noexcept(
-                std::is_nothrow_constructible_v<E, G &&>)
+            Result(Failure<G> &&f) noexcept(std::is_nothrow_constructible_v<E, G &&>)
                 : tag_(detail::Tag::Err), err_(std::forward<G>(f.error))
             {
             }
@@ -242,54 +321,67 @@ namespace pjh::result
 
         public:
             /**
-             * @brief 解包成功值；若为 Err 则抛出异常。
+             * @brief 解包成功值；若为 Err 则抛出异常。仅当 T 非 void 时可用。
              *
              * @throws result_helper::bad_result_access 当前处于 Err 状态
              * @return T& 内部成功值的引用
              */
-            [[nodiscard]] T &unwrap() &
+            [[nodiscard]] OkT &unwrap() &
+                requires(!std::is_void_v<T>)
             {
                 if (!is_ok())
-                    throw result_helper::bad_result_access(
-                        "Result::unwrap() called on Err");
+                    throw result_helper::bad_result_access("Result::unwrap() called on Err");
                 return ok_;
             }
 
             /**
-             * @brief 解包成功值；若为 Err 则抛出异常。
+             * @brief 解包成功值；若为 Err 则抛出异常。仅当 T 非 void 时可用。
              *
              * @throws result_helper::bad_result_access 当前处于 Err 状态
              * @return const T& 内部成功值的常量引用
              */
-            [[nodiscard]] const T &unwrap() const &
+            [[nodiscard]] const OkT &unwrap() const &
+                requires(!std::is_void_v<T>)
             {
                 if (!is_ok())
-                    throw result_helper::bad_result_access(
-                        "Result::unwrap() called on Err");
+                    throw result_helper::bad_result_access("Result::unwrap() called on Err");
                 return ok_;
             }
 
             /**
-             * @brief 解包并移出成功值；若为 Err 则抛出异常。
+             * @brief 解包并移出成功值；若为 Err 则抛出异常。仅当 T 非 void 时可用。
              *
              * @throws result_helper::bad_result_access 当前处于 Err 状态
              * @return T 移动得到的成功值
              */
-            [[nodiscard]] T unwrap() &&
+            [[nodiscard]] OkT unwrap() &&
+                requires(!std::is_void_v<T>)
             {
                 if (!is_ok())
-                    throw result_helper::bad_result_access(
-                        "Result::unwrap() called on Err");
+                    throw result_helper::bad_result_access("Result::unwrap() called on Err");
                 return std::move(ok_);
             }
 
             /**
-             * @brief 解包成功值；若为 Err 则返回给定默认值。
+             * @brief 断言当前为 Ok；若为 Err 则抛出异常。仅当 T 为 void 时可用。
+             *
+             * @throws result_helper::bad_result_access 当前处于 Err 状态
+             */
+            void unwrap() const
+                requires std::is_void_v<T>
+            {
+                if (is_err())
+                    throw result_helper::bad_result_access("Result<void>::unwrap() called on Err");
+            }
+
+            /**
+             * @brief 解包成功值；若为 Err 则返回给定默认值。仅当 T 非 void 时可用。
              *
              * @param val Err 时返回的默认值
              * @return T 成功值或默认值
              */
-            [[nodiscard]] T unwrap_or(T val) const
+            [[nodiscard]] OkT unwrap_or(OkT val) const
+                requires(!std::is_void_v<T>)
             {
                 return is_ok() ? ok_ : std::move(val);
             }
@@ -303,8 +395,7 @@ namespace pjh::result
             [[nodiscard]] E &unwrap_err() &
             {
                 if (!is_err())
-                    throw result_helper::bad_result_access(
-                        "Result::unwrap_err() called on Ok");
+                    throw result_helper::bad_result_access("Result::unwrap_err() called on Ok");
                 return err_;
             }
 
@@ -317,8 +408,7 @@ namespace pjh::result
             [[nodiscard]] const E &unwrap_err() const &
             {
                 if (!is_err())
-                    throw result_helper::bad_result_access(
-                        "Result::unwrap_err() called on Ok");
+                    throw result_helper::bad_result_access("Result::unwrap_err() called on Ok");
                 return err_;
             }
 
@@ -331,8 +421,7 @@ namespace pjh::result
             [[nodiscard]] E unwrap_err() &&
             {
                 if (!is_err())
-                    throw result_helper::bad_result_access(
-                        "Result::unwrap_err() called on Ok");
+                    throw result_helper::bad_result_access("Result::unwrap_err() called on Ok");
                 return std::move(err_);
             }
 
@@ -351,31 +440,37 @@ namespace pjh::result
             /**
              * @brief 转换成功值 (Map)。
              *
-             * Ok(v) 时返回 Ok(f(v))；Err(e) 时原样返回 Err(e)。
+             * Ok 时对成功值应用 f（T = void 时调用 f()），返回 Ok(f(...))；Err(e) 时原样返回 Err(e)。
              *
              * @tparam F 转换函数类型
-             * @param f 接受 T、返回 U 的可调用对象
+             * @param f 作用于成功值、返回 U 的可调用对象
              * @return Result<U, E> 新的结果类型
              */
             template <typename F>
-                requires std::invocable<F, T>
+                requires detail::MapCallable<F, T>
             [[nodiscard]] auto map(F &&f) const
-                -> Result<std::invoke_result_t<F, T>, E>
-                requires result_helper::ValidResultTypes<std::invoke_result_t<F, T>, E> &&
-                         (!std::is_same_v<std::invoke_result_t<F, T>, E>)
+                -> Result<detail::map_result_t<F, T>, E>
+                requires result_helper::ValidResultTypes<detail::map_result_t<F, T>, E> &&
+                         (!std::is_same_v<detail::map_result_t<F, T>, E>)
             {
-                using U = std::invoke_result_t<F, T>;
+                using U = detail::map_result_t<F, T>;
 
                 if (is_ok())
                 {
                     if constexpr (std::is_void_v<U>)
                     {
-                        std::invoke(f, ok_);
+                        if constexpr (std::is_void_v<T>)
+                            std::invoke(f);
+                        else
+                            std::invoke(f, ok_);
                         return Result<void, E>::Ok();
                     }
                     else
                     {
-                        return Result<U, E>::Ok(std::invoke(f, ok_));
+                        if constexpr (std::is_void_v<T>)
+                            return Result<U, E>::Ok(std::invoke(f));
+                        else
+                            return Result<U, E>::Ok(std::invoke(f, ok_));
                     }
                 }
                 else
@@ -385,7 +480,7 @@ namespace pjh::result
             /**
              * @brief 转换错误值 (Map_Err)。
              *
-             * Err(e) 时返回 Err(f(e))；Ok(v) 时原样返回 Ok(v)。
+             * Err(e) 时返回 Err(f(e))；Ok 时原样返回 Ok（T = void 时为 Ok()）。
              *
              * @tparam F 转换函数类型
              * @param f 接受 E、返回 G 的可调用对象
@@ -403,26 +498,37 @@ namespace pjh::result
                 if (is_err())
                     return Result<T, E2>::Err(std::invoke(f, err_));
                 else
-                    return Result<T, E2>::Ok(ok_);
+                {
+                    if constexpr (std::is_void_v<T>)
+                        return Result<void, E2>::Ok();
+                    else
+                        return Result<T, E2>::Ok(ok_);
+                }
             }
 
         public:
             /**
              * @brief 链式调用 (FlatMap / AndThen)。
              *
-             * Ok(v) 时调用 f(v)（f 必须返回一个 Result）；Err(e) 时短路返回 Err(e)。
+             * Ok 时调用 f（T = void 时 f()，否则 f(成功值)，f 必须返回一个 Result）；
+             * Err(e) 时短路返回 Err(e)。
              *
-             * @tparam F 接受 const T& 返回 Result 的可调用对象
+             * @tparam F 返回 Result 的可调用对象
              * @param f 后续操作
              * @return f 的返回类型（一个 Result）
              */
             template <typename F>
-                requires result_helper::ResultType<std::invoke_result_t<F, const T &>>
-            auto and_then(F &&f) const & -> std::invoke_result_t<F, const T &>
+                requires detail::CrefResultFn<F, T>
+            auto and_then(F &&f) const & -> detail::cref_result_t<F, T>
             {
-                using Ret = std::invoke_result_t<F, const T &>;
+                using Ret = detail::cref_result_t<F, T>;
                 if (is_ok())
-                    return std::invoke(f, ok_);
+                {
+                    if constexpr (std::is_void_v<T>)
+                        return std::invoke(f);
+                    else
+                        return std::invoke(f, ok_);
+                }
                 else
                     return Ret::Err(err_);
             }
@@ -430,250 +536,24 @@ namespace pjh::result
             /**
              * @brief 链式调用 (FlatMap / AndThen)，移动语义版本。
              *
-             * @tparam F 接受 T 返回 Result 的可调用对象
+             * @tparam F 返回 Result 的可调用对象
              * @param f 后续操作
              * @return f 的返回类型（一个 Result）
              */
             template <typename F>
-                requires result_helper::ResultType<std::invoke_result_t<F, T>>
-            auto and_then(F &&f) && -> std::invoke_result_t<F, T>
+                requires detail::ValueResultFn<F, T>
+            auto and_then(F &&f) && -> detail::value_result_t<F, T>
             {
-                using Ret = std::invoke_result_t<F, T>;
+                using Ret = detail::value_result_t<F, T>;
                 if (is_ok())
-                    return std::invoke(f, std::move(ok_));
+                {
+                    if constexpr (std::is_void_v<T>)
+                        return std::invoke(f);
+                    else
+                        return std::invoke(f, std::move(ok_));
+                }
                 else
                     return Ret::Err(std::move(err_));
-            }
-        };
-
-        /**
-         * @brief 结果封装类 (Monad)，T = void 的特化版本。
-         *
-         * @tparam E 失败时的错误类型
-         *
-         * @note 禁止忽略返回值 ([[nodiscard]])。
-         * @note 禁止 void 与 E 为同一类型。
-         *
-         * @warning 本特化仍基于 std::variant 实现，将在 Step 2 与主模板合并后移除。
-         */
-        template <typename E>
-            requires result_helper::ValidResultTypes<void, E> &&
-                     result_helper::NotResult<E>
-        class [[nodiscard]] Result<void, E>
-        {
-        private:
-            std::variant<std::monostate, E> data;
-
-        public:
-            static Result Ok() noexcept { return Result(std::monostate{}); }
-
-            template <typename G>
-                requires std::constructible_from<E, G &&>
-            static Result Err(G &&err) noexcept(
-                std::is_nothrow_constructible_v<E, G &&>)
-            {
-                return Result(E(std::forward<G>(err)));
-            }
-
-        public:
-            explicit Result(std::monostate) : data(std::monostate{}) {}
-            explicit Result(const E &err) : data(err) {}
-
-            explicit Result(E &&err) noexcept(std::is_nothrow_move_constructible_v<E>) : data(std::move(err)) {}
-
-            Result(const Result &)
-                requires std::copy_constructible<E>
-            = default;
-
-            Result &operator=(const Result &)
-                requires(std::is_copy_assignable_v<E>)
-            = default;
-
-            Result(Result &&) noexcept = default;
-            Result &operator=(Result &&) noexcept = default;
-
-            template <typename G>
-                requires std::constructible_from<E, const G &>
-            Result(const Failure<G> &f) noexcept(
-                std::is_nothrow_constructible_v<E, const G &>)
-                : data(E(f.error))
-            {
-            }
-
-            template <typename G>
-                requires std::constructible_from<E, G &&>
-            Result(Failure<G> &&f) noexcept(
-                std::is_nothrow_constructible_v<E, G &&>)
-                : data(E(std::forward<G>(f.error)))
-            {
-            }
-
-        public:
-            bool is_ok() const noexcept { return std::holds_alternative<std::monostate>(data); }
-            bool is_err() const noexcept { return std::holds_alternative<E>(data); }
-
-        public:
-            /**
-             * @brief 若为 Ok 则解包（无值）；若为 Err 则抛出异常。
-             *
-             * @throws result_helper::bad_result_access 当前处于 Err 状态
-             */
-            void unwrap() const
-            {
-                if (is_err())
-                    throw result_helper::bad_result_access(
-                        "Result<void>::unwrap() called on Err");
-            }
-
-            /**
-             * @brief 解包错误值；若为 Ok 则抛出异常。
-             *
-             * @throws result_helper::bad_result_access 当前处于 Ok 状态
-             * @return E& 内部错误值的引用
-             */
-            [[nodiscard]] E &unwrap_err() &
-            {
-                if (!is_err())
-                    throw result_helper::bad_result_access(
-                        "Result::unwrap_err() called on Ok");
-                return std::get<E>(data);
-            }
-
-            /**
-             * @brief 解包错误值；若为 Ok 则抛出异常。
-             *
-             * @throws result_helper::bad_result_access 当前处于 Ok 状态
-             * @return const E& 内部错误值的常量引用
-             */
-            [[nodiscard]] const E &unwrap_err() const &
-            {
-                if (!is_err())
-                    throw result_helper::bad_result_access(
-                        "Result::unwrap_err() called on Ok");
-                return std::get<E>(data);
-            }
-
-            /**
-             * @brief 解包并移出错误值；若为 Ok 则抛出异常。
-             *
-             * @throws result_helper::bad_result_access 当前处于 Ok 状态
-             * @return E 移动得到的错误值
-             */
-            [[nodiscard]] E unwrap_err() &&
-            {
-                if (!is_err())
-                    throw result_helper::bad_result_access(
-                        "Result::unwrap_err() called on Ok");
-                return std::move(std::get<E>(data));
-            }
-
-            /**
-             * @brief 解包错误值；若为 Ok 则返回给定默认值。
-             *
-             * @param err Ok 时返回的默认值
-             * @return E 错误值或默认值
-             */
-            [[nodiscard]] E unwrap_err_or(E err) const
-            {
-                return is_err() ? std::get<E>(data) : std::move(err);
-            }
-
-        public:
-            /**
-             * @brief 转换成功值 (Map)。
-             *
-             * Ok 时调用 f() 并返回 Ok(f())；Err(e) 时原样返回 Err(e)。
-             *
-             * @tparam F 转换函数类型
-             * @param f 无参、返回 U 的可调用对象
-             * @return Result<U, E> 新的结果类型
-             */
-            template <typename F>
-                requires std::invocable<F>
-            auto map(F &&f) const
-                -> Result<std::invoke_result_t<F>, E>
-            {
-                using U = std::invoke_result_t<F>;
-
-                if (is_ok())
-                {
-                    if constexpr (std::is_void_v<U>)
-                    {
-                        std::invoke(f);
-                        return Result<void, E>::Ok();
-                    }
-                    else
-                    {
-                        return Result<U, E>::Ok(std::invoke(f));
-                    }
-                }
-                else
-                {
-                    return Result<U, E>::Err(std::get<E>(data));
-                }
-            }
-
-            /**
-             * @brief 转换错误值 (Map_Err)。
-             *
-             * Err(e) 时返回 Err(f(e))；Ok 时原样返回 Ok。
-             *
-             * @tparam F 转换函数类型
-             * @param f 接受 E、返回 G 的可调用对象
-             * @return Result<void, G> 新的结果类型
-             */
-            template <typename F>
-                requires std::invocable<F, E>
-            auto map_err(F &&f) const
-                -> Result<void, std::invoke_result_t<F, E>>
-                requires result_helper::NotResult<std::invoke_result_t<F, E>>
-            {
-                using E2 = std::invoke_result_t<F, E>;
-
-                if (is_err())
-                    return Result<void, E2>::Err(std::invoke(f, std::get<E>(data)));
-                else
-                    return Result<void, E2>::Ok();
-            }
-
-        public:
-            /**
-             * @brief 链式调用 (FlatMap / AndThen)。
-             *
-             * Ok 时调用 f()（f 必须返回一个 Result）；Err(e) 时短路返回 Err(e)。
-             *
-             * @tparam F 无参、返回 Result 的可调用对象
-             * @param f 后续操作
-             * @return f 的返回类型（一个 Result）
-             */
-            template <typename F>
-                requires result_helper::ResultType<std::invoke_result_t<F>>
-            auto and_then(F &&f) const & -> std::invoke_result_t<F>
-            {
-                using Ret = std::invoke_result_t<F>;
-
-                if (is_ok())
-                    return std::invoke(f);
-                else
-                    return Ret::Err(std::get<E>(data));
-            }
-
-            /**
-             * @brief 链式调用 (FlatMap / AndThen)，移动语义版本。
-             *
-             * @tparam F 无参、返回 Result 的可调用对象
-             * @param f 后续操作
-             * @return f 的返回类型（一个 Result）
-             */
-            template <typename F>
-                requires result_helper::ResultType<std::invoke_result_t<F>>
-            auto and_then(F &&f) && -> std::invoke_result_t<F>
-            {
-                using Ret = std::invoke_result_t<F>;
-                if (is_ok())
-                    return std::invoke(f);
-                else
-                    return Ret::Err(std::move(std::get<E>(data)));
             }
         };
 
