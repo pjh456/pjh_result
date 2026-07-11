@@ -752,6 +752,33 @@ namespace pjh::result
             }
             return Result<T, E>::Err(std::invoke(f));
         }
+
+    public:
+        /**
+         * @brief Equality comparison.
+         *
+         * Two options are equal iff both are None, or both are Some with equal values
+         * (or both Some when `T = void`).
+         *
+         * Available only when the stored type is equality-comparable. `operator!=` is
+         * synthesized by the compiler (C++20).
+         *
+         * @param a left operand
+         * @param b right operand
+         * @return whether @p a and @p b are equal
+         */
+        friend bool operator==(const Option &a, const Option &b)
+            requires(std::is_void_v<T> || std::equality_comparable<StoredT>)
+        {
+            if (a.has_value_ != b.has_value_)
+                return false;
+            if (!a.has_value_)
+                return true;
+            if constexpr (std::is_void_v<T>)
+                return true;
+            else
+                return a.value_ == b.value_;
+        }
     };
 }
 
