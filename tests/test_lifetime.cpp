@@ -74,3 +74,25 @@ TEST_CASE("copy assignment offers strong exception guarantee")
     CHECK(b.is_err());   // this 保持原状
     CHECK(b.unwrap_err() == 7);
 }
+
+TEST_CASE("no leak through rvalue unwrap")
+{
+    InstanceCounter::reset();
+    {
+        auto r = res::Result<InstanceCounter, int>::Ok(InstanceCounter{10});
+        InstanceCounter v = std::move(r).unwrap();
+        CHECK(v.id == 10);
+    }
+    CHECK(InstanceCounter::live == 0);
+}
+
+TEST_CASE("no leak through rvalue unwrap_err")
+{
+    InstanceCounter::reset();
+    {
+        auto r = res::Result<int, InstanceCounter>::Err(InstanceCounter{11});
+        InstanceCounter e = std::move(r).unwrap_err();
+        CHECK(e.id == 11);
+    }
+    CHECK(InstanceCounter::live == 0);
+}

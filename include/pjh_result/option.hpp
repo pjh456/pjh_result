@@ -261,7 +261,10 @@ namespace pjh::result
         {
             if (!has_value_)
                 throw bad_result_access("Option::unwrap() called on None");
-            return std::move(value_);
+            StoredT tmp = std::move(value_);
+            destroy_();
+            has_value_ = false;
+            return tmp;
         }
 
         /**
@@ -321,7 +324,10 @@ namespace pjh::result
         {
             if (!has_value_)
                 throw bad_result_access(msg);
-            return std::move(value_);
+            StoredT tmp = std::move(value_);
+            destroy_();
+            has_value_ = false;
+            return tmp;
         }
 
         /**

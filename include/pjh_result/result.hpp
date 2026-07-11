@@ -29,7 +29,8 @@ namespace pjh::result
         enum class Tag : unsigned char
         {
             Ok,
-            Err
+            Err,
+            Moved
         };
 
         /// @brief Result type of `map`: `f()` when `T = void`, otherwise `f(T)`.
@@ -183,6 +184,8 @@ namespace pjh::result
         /// @brief Destroys the currently active member; a no-op for trivially destructible types.
         void destroy_() noexcept
         {
+            if (tag_ == detail::Tag::Moved)
+                return;
             if (tag_ == detail::Tag::Ok)
             {
                 if constexpr (!std::is_trivially_destructible_v<OkT>)
@@ -193,6 +196,13 @@ namespace pjh::result
                 if constexpr (!std::is_trivially_destructible_v<E>)
                     err_.~E();
             }
+        }
+
+        /// @brief Throws if the Result is in the Moved (post-unwrap) state.
+        void require_not_moved_() const
+        {
+            if (tag_ == detail::Tag::Moved)
+                throw bad_result_access("Result used after move");
         }
 
         /// @brief Nothrow move-constructs this object's active member from an rvalue `Result`
@@ -377,6 +387,7 @@ namespace pjh::result
         [[nodiscard]] OkT &unwrap() &
             requires(!std::is_void_v<T>)
         {
+            require_not_moved_();
             if (!is_ok())
                 throw bad_result_access("Result::unwrap() called on Err");
             return ok_;
@@ -391,6 +402,7 @@ namespace pjh::result
         [[nodiscard]] const OkT &unwrap() const &
             requires(!std::is_void_v<T>)
         {
+            require_not_moved_();
             if (!is_ok())
                 throw bad_result_access("Result::unwrap() called on Err");
             return ok_;
@@ -408,7 +420,10 @@ namespace pjh::result
         {
             if (!is_ok())
                 throw bad_result_access("Result::unwrap() called on Err");
-            return std::move(ok_);
+            OkT tmp = std::move(ok_);
+            destroy_();
+            tag_ = detail::Tag::Moved;
+            return tmp;
         }
 
         /**
@@ -419,6 +434,7 @@ namespace pjh::result
         void unwrap() const
             requires std::is_void_v<T>
         {
+            require_not_moved_();
             if (is_err())
                 throw bad_result_access("Result<void>::unwrap() called on Err");
         }
@@ -447,6 +463,7 @@ namespace pjh::result
         [[nodiscard]] OkT &expect(const std::string &msg) &
             requires(!std::is_void_v<T>)
         {
+            require_not_moved_();
             if (!is_ok())
                 throw bad_result_access(msg);
             return ok_;
@@ -463,6 +480,7 @@ namespace pjh::result
         [[nodiscard]] const OkT &expect(const std::string &msg) const &
             requires(!std::is_void_v<T>)
         {
+            require_not_moved_();
             if (!is_ok())
                 throw bad_result_access(msg);
             return ok_;
@@ -481,7 +499,10 @@ namespace pjh::result
         {
             if (!is_ok())
                 throw bad_result_access(msg);
-            return std::move(ok_);
+            OkT tmp = std::move(ok_);
+            destroy_();
+            tag_ = detail::Tag::Moved;
+            return tmp;
         }
 
         /**
@@ -494,6 +515,7 @@ namespace pjh::result
         void expect(const std::string &msg) const
             requires std::is_void_v<T>
         {
+            require_not_moved_();
             if (is_err())
                 throw bad_result_access(msg);
         }
@@ -511,6 +533,7 @@ namespace pjh::result
                     std::convertible_to<std::invoke_result_t<F, E>, T>
         [[nodiscard]] T unwrap_or_else(F &&f) const
         {
+            require_not_moved_();
             if (is_ok())
                 return ok_;
             return static_cast<T>(std::invoke(f, err_));
@@ -538,6 +561,7 @@ namespace pjh::result
          */
         [[nodiscard]] E &unwrap_err() &
         {
+            require_not_moved_();
             if (!is_err())
                 throw bad_result_access("Result::unwrap_err() called on Ok");
             return err_;
@@ -551,6 +575,7 @@ namespace pjh::result
          */
         [[nodiscard]] const E &unwrap_err() const &
         {
+            require_not_moved_();
             if (!is_err())
                 throw bad_result_access("Result::unwrap_err() called on Ok");
             return err_;
@@ -566,7 +591,10 @@ namespace pjh::result
         {
             if (!is_err())
                 throw bad_result_access("Result::unwrap_err() called on Ok");
-            return std::move(err_);
+            E tmp = std::move(err_);
+            destroy_();
+            tag_ = detail::Tag::Moved;
+            return tmp;
         }
 
         /**
@@ -589,6 +617,7 @@ namespace pjh::result
          */
         [[nodiscard]] E &expect_err(const std::string &msg) &
         {
+            require_not_moved_();
             if (!is_err())
                 throw bad_result_access(msg);
             return err_;
@@ -603,6 +632,7 @@ namespace pjh::result
          */
         [[nodiscard]] const E &expect_err(const std::string &msg) const &
         {
+            require_not_moved_();
             if (!is_err())
                 throw bad_result_access(msg);
             return err_;
@@ -619,7 +649,10 @@ namespace pjh::result
         {
             if (!is_err())
                 throw bad_result_access(msg);
-            return std::move(err_);
+            E tmp = std::move(err_);
+            destroy_();
+            tag_ = detail::Tag::Moved;
+            return tmp;
         }
 
     public:
@@ -640,6 +673,7 @@ namespace pjh::result
             requires detail::ValidResultTypes<detail::map_result_t<F, T>, E> &&
                      (!std::is_same_v<detail::map_result_t<F, T>, E>)
         {
+            require_not_moved_();
             using U = detail::map_result_t<F, T>;
 
             if (is_ok())
@@ -680,6 +714,7 @@ namespace pjh::result
             requires detail::ValidResultTypes<T, std::invoke_result_t<F, E>> &&
                      (!std::is_same_v<std::invoke_result_t<F, E>, T>)
         {
+            require_not_moved_();
             using E2 = std::invoke_result_t<F, E>;
 
             if (is_err())
@@ -735,6 +770,7 @@ namespace pjh::result
                      std::convertible_to<std::invoke_result_t<D, E>, detail::map_result_t<F, T>>
         [[nodiscard]] detail::map_result_t<F, T> map_or_else(D &&d, F &&f) const
         {
+            require_not_moved_();
             using U = detail::map_result_t<F, T>;
             if (is_ok())
             {
@@ -802,6 +838,7 @@ namespace pjh::result
             requires detail::CrefResultFn<F, T>
         auto and_then(F &&f) const & -> detail::cref_result_t<F, T>
         {
+            require_not_moved_();
             using Ret = detail::cref_result_t<F, T>;
             if (is_ok())
             {
@@ -825,6 +862,7 @@ namespace pjh::result
             requires detail::ValueResultFn<F, T>
         auto and_then(F &&f) && -> detail::value_result_t<F, T>
         {
+            require_not_moved_();
             using Ret = detail::value_result_t<F, T>;
             if (is_ok())
             {
@@ -851,6 +889,7 @@ namespace pjh::result
             requires detail::ResultType<std::invoke_result_t<F, const E &>>
         auto or_else(F &&f) const & -> std::invoke_result_t<F, const E &>
         {
+            require_not_moved_();
             using Ret = std::invoke_result_t<F, const E &>;
             if (is_err())
                 return std::invoke(f, err_);
@@ -871,6 +910,7 @@ namespace pjh::result
             requires detail::ResultType<std::invoke_result_t<F, E>>
         auto or_else(F &&f) && -> std::invoke_result_t<F, E>
         {
+            require_not_moved_();
             using Ret = std::invoke_result_t<F, E>;
             if (is_err())
                 return std::invoke(f, std::move(err_));
@@ -899,6 +939,8 @@ namespace pjh::result
             requires(std::is_void_v<T> || std::equality_comparable<OkT>) &&
                         std::equality_comparable<E>
         {
+            if (a.tag_ == detail::Tag::Moved || b.tag_ == detail::Tag::Moved)
+                throw bad_result_access("Result comparison after move");
             if (a.tag_ != b.tag_)
                 return false;
             if (a.is_ok())

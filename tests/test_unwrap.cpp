@@ -51,6 +51,44 @@ TEST_CASE("rvalue unwrap moves the value out")
     CHECK(s == "movable");
 }
 
+TEST_CASE("rvalue unwrap leaves Result in moved state")
+{
+    auto r = res::Result<int, std::string>::Ok(42);
+    int v = std::move(r).unwrap();
+    CHECK(v == 42);
+    CHECK_FALSE(r.is_ok());
+    CHECK_FALSE(r.is_err());
+    CHECK_THROWS_AS((void)r.unwrap(), bad_access);
+}
+
+TEST_CASE("rvalue unwrap_err leaves Result in moved state")
+{
+    auto r = res::Result<int, std::string>::Err(std::string("e"));
+    std::string e = std::move(r).unwrap_err();
+    CHECK(e == "e");
+    CHECK_FALSE(r.is_ok());
+    CHECK_FALSE(r.is_err());
+    CHECK_THROWS_AS((void)r.unwrap_err(), bad_access);
+}
+
+TEST_CASE("rvalue expect leaves Result in moved state")
+{
+    auto r = res::Result<int, std::string>::Ok(7);
+    int v = std::move(r).expect("ok");
+    CHECK(v == 7);
+    CHECK_FALSE(r.is_ok());
+    CHECK_THROWS_AS((void)r.expect("used after moved"), bad_access);
+}
+
+TEST_CASE("rvalue expect_err leaves Result in moved state")
+{
+    auto r = res::Result<int, std::string>::Err(std::string("err"));
+    std::string e = std::move(r).expect_err("err");
+    CHECK(e == "err");
+    CHECK_FALSE(r.is_err());
+    CHECK_THROWS_AS((void)r.expect_err("used after moved"), bad_access);
+}
+
 TEST_CASE("expect returns value on Ok, throws custom message on Err")
 {
     auto ok = res::Result<int, std::string>::Ok(5);
@@ -72,10 +110,14 @@ TEST_CASE("expect_err returns error on Err, throws custom message on Ok")
 TEST_CASE("unwrap_or_else computes fallback from the error")
 {
     auto err = res::Result<int, std::string>::Err(std::string("xyz"));
-    CHECK(err.unwrap_or_else([](const std::string &e) { return static_cast<int>(e.size()); }) == 3);
+    CHECK(err.unwrap_or_else(
+              [](const std::string &e)
+              { return static_cast<int>(e.size()); }) == 3);
 
     auto ok = res::Result<int, std::string>::Ok(7);
-    CHECK(ok.unwrap_or_else([](const std::string &) { return 0; }) == 7);
+    CHECK(ok.unwrap_or_else(
+              [](const std::string &)
+              { return 0; }) == 7);
 }
 
 TEST_CASE("unwrap_or_default returns default-constructed T on Err")

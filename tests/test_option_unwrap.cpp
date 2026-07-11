@@ -30,6 +30,24 @@ TEST_CASE("rvalue unwrap moves the value out")
     CHECK(s == "movable");
 }
 
+TEST_CASE("rvalue unwrap leaves Option None")
+{
+    auto o = res::Option<int>::Some(42);
+    int v = std::move(o).unwrap();
+    CHECK(v == 42);
+    CHECK(o.is_none());
+    CHECK_THROWS_AS((void)o.unwrap(), bad_access);
+}
+
+TEST_CASE("rvalue expect leaves Option None")
+{
+    auto o = res::Option<int>::Some(7);
+    int v = std::move(o).expect("some");
+    CHECK(v == 7);
+    CHECK(o.is_none());
+    CHECK_THROWS_AS((void)o.expect("used after moved"), bad_access);
+}
+
 TEST_CASE("expect returns value on Some, throws custom message on None")
 {
     auto some = res::Option<int>::Some(5);
@@ -47,8 +65,12 @@ TEST_CASE("unwrap_or returns fallback on None")
 
 TEST_CASE("unwrap_or_else computes fallback on None")
 {
-    CHECK(res::Option<int>::None().unwrap_or_else([]() { return 42; }) == 42);
-    CHECK(res::Option<int>::Some(7).unwrap_or_else([]() { return 42; }) == 7);
+    CHECK(res::Option<int>::None().unwrap_or_else(
+              []()
+              { return 42; }) == 42);
+    CHECK(res::Option<int>::Some(7).unwrap_or_else(
+              []()
+              { return 42; }) == 7);
 }
 
 TEST_CASE("unwrap_or_default returns default-constructed T on None")

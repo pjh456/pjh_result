@@ -38,10 +38,10 @@ TEST_CASE("no leak through assignment across states")
     {
         auto a = res::Option<InstanceCounter>::Some(InstanceCounter{3});
         auto b = res::Option<InstanceCounter>::None();
-        b = a;                 // None <- Some
+        b = a; // None <- Some
         CHECK(b.unwrap().id == 3);
         a = res::Option<InstanceCounter>::None();
-        b = std::move(a);      // Some <- None
+        b = std::move(a); // Some <- None
         CHECK(b.is_none());
     }
     CHECK(InstanceCounter::live == 0);
@@ -54,4 +54,15 @@ TEST_CASE("copy assignment offers strong exception guarantee")
 
     CHECK_THROWS(b = a); // copying a's ThrowOnCopy throws
     CHECK(b.is_none());  // this unchanged
+}
+
+TEST_CASE("no leak through rvalue unwrap")
+{
+    InstanceCounter::reset();
+    {
+        auto o = res::Option<InstanceCounter>::Some(InstanceCounter{12});
+        InstanceCounter v = std::move(o).unwrap();
+        CHECK(v.id == 12);
+    }
+    CHECK(InstanceCounter::live == 0);
 }
