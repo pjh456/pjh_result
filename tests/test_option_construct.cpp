@@ -43,3 +43,13 @@ TEST_CASE("copy of None stays None")
     auto b = a;
     CHECK(b.is_none());
 }
+
+TEST_CASE("is_some_and checks the value")
+{
+    auto some = res::Option<int>::Some(10);
+    CHECK(some.is_some_and([](int v) { return v > 5; }));
+    CHECK_FALSE(some.is_some_and([](int v) { return v > 50; }));
+
+    auto none = res::Option<int>::None();
+    CHECK_FALSE(none.is_some_and([](int) { return true; }));
+}

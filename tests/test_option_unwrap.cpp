@@ -29,3 +29,30 @@ TEST_CASE("rvalue unwrap moves the value out")
     std::string s = std::move(some).unwrap();
     CHECK(s == "movable");
 }
+
+TEST_CASE("expect returns value on Some, throws custom message on None")
+{
+    auto some = res::Option<int>::Some(5);
+    CHECK(some.expect("should be some") == 5);
+
+    auto none = res::Option<int>::None();
+    CHECK_THROWS_AS((void)none.expect("boom"), bad_access);
+}
+
+TEST_CASE("unwrap_or returns fallback on None")
+{
+    CHECK(res::Option<int>::None().unwrap_or(-1) == -1);
+    CHECK(res::Option<int>::Some(7).unwrap_or(-1) == 7);
+}
+
+TEST_CASE("unwrap_or_else computes fallback on None")
+{
+    CHECK(res::Option<int>::None().unwrap_or_else([]() { return 42; }) == 42);
+    CHECK(res::Option<int>::Some(7).unwrap_or_else([]() { return 42; }) == 7);
+}
+
+TEST_CASE("unwrap_or_default returns default-constructed T on None")
+{
+    CHECK(res::Option<int>::None().unwrap_or_default() == 0);
+    CHECK(res::Option<int>::Some(9).unwrap_or_default() == 9);
+}

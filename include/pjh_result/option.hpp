@@ -8,6 +8,7 @@
 #include <concepts>
 #include <memory>
 #include <new>
+#include <string>
 #include <type_traits>
 #include <utility>
 
@@ -178,6 +179,27 @@ namespace pjh::result
         /// @brief Whether the option is currently empty.
         bool is_none() const noexcept { return !has_value_; }
 
+        /**
+         * @brief Whether the option is Some and the value satisfies @p f.
+         *
+         * When `T = void`, @p f is invoked with no argument.
+         *
+         * @tparam F predicate on the value (or nullary when `T = void`)
+         * @param f the predicate
+         * @return `is_some() && bool(f(...))`
+         */
+        template <typename F>
+            requires detail::MapCallable<F, T>
+        [[nodiscard]] bool is_some_and(F &&f) const
+        {
+            if (!has_value_)
+                return false;
+            if constexpr (std::is_void_v<T>)
+                return static_cast<bool>(std::invoke(f));
+            else
+                return static_cast<bool>(std::invoke(f, value_));
+        }
+
     public:
         /**
          * @brief Unwraps the contained value; throws if None. Available only when `T` is non-void.
@@ -232,6 +254,113 @@ namespace pjh::result
         {
             if (!has_value_)
                 throw bad_result_access("Option<void>::unwrap() called on None");
+        }
+
+        /**
+         * @brief Unwraps the value, throwing with a custom message if None.
+         *        Available only when `T` is non-void.
+         *
+         * @param msg message carried by the thrown exception
+         * @throws bad_result_access when currently None
+         * @return reference to the contained value
+         */
+        [[nodiscard]] StoredT &expect(const std::string &msg) &
+            requires(!std::is_void_v<T>)
+        {
+            if (!has_value_)
+                throw bad_result_access(msg);
+            return value_;
+        }
+
+        /**
+         * @brief Unwraps the value (const overload), throwing @p msg if None.
+         *        Available only when `T` is non-void.
+         *
+         * @param msg message carried by the thrown exception
+         * @throws bad_result_access when currently None
+         * @return const reference to the contained value
+         */
+        [[nodiscard]] const StoredT &expect(const std::string &msg) const &
+            requires(!std::is_void_v<T>)
+        {
+            if (!has_value_)
+                throw bad_result_access(msg);
+            return value_;
+        }
+
+        /**
+         * @brief Unwraps and moves out the value, throwing @p msg if None.
+         *        Available only when `T` is non-void.
+         *
+         * @param msg message carried by the thrown exception
+         * @throws bad_result_access when currently None
+         * @return the moved-out value
+         */
+        [[nodiscard]] StoredT expect(const std::string &msg) &&
+            requires(!std::is_void_v<T>)
+        {
+            if (!has_value_)
+                throw bad_result_access(msg);
+            return std::move(value_);
+        }
+
+        /**
+         * @brief Asserts the option is Some, throwing @p msg if None.
+         *        Available only when `T` is `void`.
+         *
+         * @param msg message carried by the thrown exception
+         * @throws bad_result_access when currently None
+         */
+        void expect(const std::string &msg) const
+            requires std::is_void_v<T>
+        {
+            if (!has_value_)
+                throw bad_result_access(msg);
+        }
+
+        /**
+         * @brief Unwraps the value, or returns the given default if None.
+         *        Available only when `T` is non-void.
+         *
+         * @param val the default returned when None
+         * @return the contained value, or @p val
+         */
+        [[nodiscard]] StoredT unwrap_or(StoredT val) const
+            requires(!std::is_void_v<T>)
+        {
+            return has_value_ ? value_ : std::move(val);
+        }
+
+        /**
+         * @brief Unwraps the value, or computes a fallback if None.
+         *        Available only when `T` is non-void.
+         *
+         * @tparam F nullary callable returning a value convertible to `T`
+         * @param f fallback producer invoked when None
+         * @return the contained value, or `f()`
+         */
+        template <typename F>
+            requires(!std::is_void_v<T>) && std::invocable<F> &&
+                    std::convertible_to<std::invoke_result_t<F>, T>
+        [[nodiscard]] T unwrap_or_else(F &&f) const
+        {
+            if (has_value_)
+                return value_;
+            return static_cast<T>(std::invoke(f));
+        }
+
+        /**
+         * @brief Unwraps the value, or returns a default-constructed `T` if None.
+         *        Available only when `T` is non-void and default-initializable.
+         *
+         * @return the contained value, or `T{}`
+         */
+        [[nodiscard]] T unwrap_or_default() const
+            requires(!std::is_void_v<T>) && std::default_initializable<T>
+        {
+            if (has_value_)
+                return value_;
+            return T{};
         }
     };
 }
