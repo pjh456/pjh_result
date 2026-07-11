@@ -393,6 +393,45 @@ namespace pjh::result
             return Option<R>::None();
         }
 
+        /**
+         * @brief Returns `Some` on exactly one of `*this` and @p other being `Some`;
+         *        `None` when both are `Some` or both are `None`.
+         *
+         * @param other the other Option
+         * @return `Option<T>`
+         */
+        [[nodiscard]] Option x_or(Option other) const
+            requires(!std::is_void_v<T>)
+        {
+            if (has_value_ != other.has_value_)
+                return has_value_ ? Option::Some(value_) : Option::Some(other.value_);
+            return Option::None();
+        }
+
+        /// @overload
+        [[nodiscard]] Option x_or(Option other) &&
+            requires(!std::is_void_v<T>)
+        {
+            if (has_value_ != other.has_value_)
+            {
+                if (has_value_)
+                {
+                    auto v = Option::Some(std::move(value_));
+                    destroy_();
+                    has_value_ = false;
+                    return v;
+                }
+                auto v = Option::Some(std::move(other.value_));
+                return v;
+            }
+            if (has_value_)
+            {
+                destroy_();
+                has_value_ = false;
+            }
+            return Option::None();
+        }
+
     public:
         /**
          * @brief Unwraps the contained value; throws if None. Available only when `T` is non-void.

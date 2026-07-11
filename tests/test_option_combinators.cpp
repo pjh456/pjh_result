@@ -167,6 +167,26 @@ TEST_CASE("flatten rvalue on None returns None")
     CHECK(flat.is_none());
 }
 
+TEST_CASE("x_or on exactly one Some keeps it")
+{
+    auto some_a = res::Option<int>::Some(1);
+    auto some_b = res::Option<int>::Some(2);
+    auto none = res::Option<int>::None();
+
+    CHECK(some_a.x_or(none).unwrap() == 1);
+    CHECK(none.x_or(some_a).unwrap() == 1);
+    CHECK(some_a.x_or(some_b).is_none());
+    CHECK(none.x_or(none).is_none());
+}
+
+TEST_CASE("x_or rvalue moves the value")
+{
+    auto a = res::Option<std::string>::Some("hello");
+    auto b = res::Option<std::string>::None();
+    auto r = std::move(a).x_or(std::move(b));
+    CHECK(r.unwrap() == "hello");
+}
+
 TEST_CASE("zip pairs two Somes")
 {
     auto a = res::Option<int>::Some(1);
