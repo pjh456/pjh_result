@@ -120,6 +120,21 @@ TEST_CASE("unwrap_or_else computes fallback from the error")
               { return 0; }) == 7);
 }
 
+TEST_CASE("unwrap_or_else accepts callable taking E by value or const ref")
+{
+    auto err = res::Result<int, std::string>::Err(std::string("abcd"));
+
+    auto r1 = err.unwrap_or_else(
+        [](const std::string &e)
+        { return static_cast<int>(e.size()); });
+    CHECK(r1 == 4);
+
+    auto r2 = err.unwrap_or_else(
+        [](std::string e)
+        { return static_cast<int>(e.size()); });
+    CHECK(r2 == 4);
+}
+
 TEST_CASE("unwrap_or_default returns default-constructed T on Err")
 {
     auto err = res::Result<int, std::string>::Err(std::string("e"));

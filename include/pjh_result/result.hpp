@@ -529,8 +529,8 @@ namespace pjh::result
          * @return the success value, or `f(error)`
          */
         template <typename F>
-            requires(!std::is_void_v<T>) && std::invocable<F, E> &&
-                    std::convertible_to<std::invoke_result_t<F, E>, T>
+            requires(!std::is_void_v<T>) && std::invocable<F, const E &> &&
+                    std::convertible_to<std::invoke_result_t<F, const E &>, T>
         [[nodiscard]] T unwrap_or_else(F &&f) const
         {
             require_not_moved_();
