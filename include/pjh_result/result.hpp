@@ -153,9 +153,9 @@ namespace pjh::result
              * @param val 为 Err 的默认返回值
              * @return const T& 内部值的常量引用或默认值
              */
-            [[nodiscard]] const T &unwrap_or(const T &val) const
+            [[nodiscard]] T unwrap_or(T val) const
             {
-                return is_ok() ? std::get<T>(data) : val;
+                return is_ok() ? std::get<T>(data) : std::move(val);
             }
 
             /**
@@ -208,9 +208,9 @@ namespace pjh::result
              * @param err 为 Ok 的默认返回值
              * @return const E& 内部值的常量引用或默认值
              */
-            [[nodiscard]] const E &unwrap_err_or(const E &err) const
+            [[nodiscard]] E unwrap_err_or(E err) const
             {
-                return is_err() ? std::get<E>(data) : err;
+                return is_err() ? std::get<E>(data) : std::move(err);
             }
 
         public:
@@ -447,9 +447,9 @@ namespace pjh::result
              * @param err 为 Ok 的默认返回值
              * @return const E& 内部值的常量引用或默认值
              */
-            [[nodiscard]] const E &unwrap_err_or(const E &err) const
+            [[nodiscard]] E unwrap_err_or(E err) const
             {
-                return is_err() ? std::get<E>(data) : err;
+                return is_err() ? std::get<E>(data) : std::move(err);
             }
 
         public:
