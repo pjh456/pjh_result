@@ -16,6 +16,26 @@
 
 namespace pjh::result
 {
+    template <typename T>
+    class Option;
+
+    namespace detail
+    {
+        /// @brief Trait detecting whether a type is an `Option` specialization.
+        template <typename>
+        struct is_option : std::false_type
+        {
+        };
+        template <typename U>
+        struct is_option<Option<U>> : std::true_type
+        {
+        };
+
+        /// @brief Satisfied when `X` (ignoring cvref) is an `Option`.
+        template <typename X>
+        concept OptionType = is_option<std::remove_cvref_t<X>>::value;
+    }
+
     /**
      * @brief An optional value monad.
      *
@@ -361,6 +381,263 @@ namespace pjh::result
             if (has_value_)
                 return value_;
             return T{};
+        }
+
+    public:
+        /**
+         * @brief Transforms the contained value (Map).
+         *
+         * On Some, applies `f` (calls `f()` when `T = void`) and returns `Some(f(...))`;
+         * on None, returns `None`.
+         *
+         * @tparam F the transform callable
+         * @param f callable applied to the value, returning `U`
+         * @return `Option<U>`
+         */
+        template <typename F>
+            requires detail::MapCallable<F, T>
+        [[nodiscard]] auto map(F &&f) const -> Option<detail::map_result_t<F, T>>
+        {
+            using U = detail::map_result_t<F, T>;
+            if (has_value_)
+            {
+                if constexpr (std::is_void_v<U>)
+                {
+                    if constexpr (std::is_void_v<T>)
+                        std::invoke(f);
+                    else
+                        std::invoke(f, value_);
+                    return Option<void>::Some();
+                }
+                else
+                {
+                    if constexpr (std::is_void_v<T>)
+                        return Option<U>::Some(std::invoke(f));
+                    else
+                        return Option<U>::Some(std::invoke(f, value_));
+                }
+            }
+            return Option<U>::None();
+        }
+
+        /**
+         * @brief Returns `f(value)` if Some, otherwise the provided default.
+         *
+         * Collapses to a plain value `U`. When `T = void`, `f()` is called.
+         *
+         * @tparam F callable producing `U` (or nullary when `T = void`)
+         * @param def value returned when None
+         * @param f transform applied to the value
+         * @return `f(...)` if Some, otherwise @p def
+         */
+        template <typename F>
+            requires detail::MapCallable<F, T> && (!std::is_void_v<detail::map_result_t<F, T>>)
+        [[nodiscard]] detail::map_result_t<F, T> map_or(detail::map_result_t<F, T> def, F &&f) const
+        {
+            if (has_value_)
+            {
+                if constexpr (std::is_void_v<T>)
+                    return std::invoke(f);
+                else
+                    return std::invoke(f, value_);
+            }
+            return def;
+        }
+
+        /**
+         * @brief Returns `f(value)` if Some, otherwise `d()`.
+         *
+         * Collapses to a plain value `U`. When `T = void`, `f()` is called.
+         *
+         * @tparam D nullary callable producing `U`
+         * @tparam F callable producing `U` from the value (or nullary when `T = void`)
+         * @param d fallback producer invoked when None
+         * @param f transform applied to the value
+         * @return `f(...)` if Some, otherwise `d()`
+         */
+        template <typename D, typename F>
+            requires detail::MapCallable<F, T> && std::invocable<D> &&
+                     (!std::is_void_v<detail::map_result_t<F, T>>) &&
+                     std::convertible_to<std::invoke_result_t<D>, detail::map_result_t<F, T>>
+        [[nodiscard]] detail::map_result_t<F, T> map_or_else(D &&d, F &&f) const
+        {
+            using U = detail::map_result_t<F, T>;
+            if (has_value_)
+            {
+                if constexpr (std::is_void_v<T>)
+                    return std::invoke(f);
+                else
+                    return std::invoke(f, value_);
+            }
+            return static_cast<U>(std::invoke(d));
+        }
+
+        /**
+         * @brief Invokes @p f on the value if Some, then returns `*this` unchanged.
+         *
+         * When `T = void`, `f()` is called.
+         *
+         * @tparam F callable observing the value (or nullary when `T = void`)
+         * @param f the observer
+         * @return const reference to `*this`
+         * @warning Returns a reference to `*this`; do not call on a temporary and keep the result.
+         */
+        template <typename F>
+            requires detail::MapCallable<F, T>
+        const Option &inspect(F &&f) const &
+        {
+            if (has_value_)
+            {
+                if constexpr (std::is_void_v<T>)
+                    std::invoke(f);
+                else
+                    std::invoke(f, value_);
+            }
+            return *this;
+        }
+
+    public:
+        /**
+         * @brief Chains an option-returning operation (FlatMap / AndThen).
+         *
+         * On Some, invokes `f` (`f()` when `T = void`, otherwise `f(value)`; `f` must return an
+         * `Option`); on None, short-circuits and returns `None`.
+         *
+         * @tparam F callable returning an `Option`
+         * @param f the follow-up operation
+         * @return the return type of `f` (an `Option`)
+         */
+        template <typename F>
+            requires detail::OptionType<detail::cref_result_t<F, T>>
+        auto and_then(F &&f) const & -> detail::cref_result_t<F, T>
+        {
+            using Ret = detail::cref_result_t<F, T>;
+            if (has_value_)
+            {
+                if constexpr (std::is_void_v<T>)
+                    return std::invoke(f);
+                else
+                    return std::invoke(f, value_);
+            }
+            return Ret::None();
+        }
+
+        /**
+         * @brief Chains an option-returning operation (FlatMap / AndThen), rvalue/move overload.
+         *
+         * @tparam F callable returning an `Option`
+         * @param f the follow-up operation
+         * @return the return type of `f` (an `Option`)
+         */
+        template <typename F>
+            requires detail::OptionType<detail::value_result_t<F, T>>
+        auto and_then(F &&f) && -> detail::value_result_t<F, T>
+        {
+            using Ret = detail::value_result_t<F, T>;
+            if (has_value_)
+            {
+                if constexpr (std::is_void_v<T>)
+                    return std::invoke(f);
+                else
+                    return std::invoke(f, std::move(value_));
+            }
+            return Ret::None();
+        }
+
+        /**
+         * @brief Returns `*this` if Some, otherwise the option produced by `f()`.
+         *
+         * @tparam F nullary callable returning an `Option`
+         * @param f the recovery producer
+         * @return `*this` (as the result type) if Some, otherwise `f()`
+         */
+        template <typename F>
+            requires detail::OptionType<std::invoke_result_t<F>>
+        auto or_else(F &&f) const & -> std::invoke_result_t<F>
+        {
+            using Ret = std::invoke_result_t<F>;
+            if (!has_value_)
+                return std::invoke(f);
+            if constexpr (std::is_void_v<T>)
+                return Ret::Some();
+            else
+                return Ret::Some(value_);
+        }
+
+        /**
+         * @brief Returns `*this` if Some, otherwise `f()`, rvalue/move overload.
+         *
+         * @tparam F nullary callable returning an `Option`
+         * @param f the recovery producer
+         * @return `*this` (as the result type) if Some, otherwise `f()`
+         */
+        template <typename F>
+            requires detail::OptionType<std::invoke_result_t<F>>
+        auto or_else(F &&f) && -> std::invoke_result_t<F>
+        {
+            using Ret = std::invoke_result_t<F>;
+            if (!has_value_)
+                return std::invoke(f);
+            if constexpr (std::is_void_v<T>)
+                return Ret::Some();
+            else
+                return Ret::Some(std::move(value_));
+        }
+
+        /**
+         * @brief Keeps the value only if it satisfies @p pred, otherwise yields `None`.
+         *
+         * When `T = void`, `pred()` is called.
+         *
+         * @tparam F predicate on the value (or nullary when `T = void`)
+         * @param pred the predicate
+         * @return `Some(value)` if present and @p pred holds, otherwise `None`
+         */
+        template <typename F>
+            requires detail::MapCallable<F, T> && std::copy_constructible<StoredT>
+        [[nodiscard]] Option filter(F &&pred) const &
+        {
+            if (has_value_)
+            {
+                if constexpr (std::is_void_v<T>)
+                {
+                    if (std::invoke(pred))
+                        return Option::Some();
+                }
+                else
+                {
+                    if (std::invoke(pred, value_))
+                        return Option::Some(value_);
+                }
+            }
+            return Option::None();
+        }
+
+        /**
+         * @brief Keeps the value only if it satisfies @p pred, rvalue/move overload.
+         *
+         * @tparam F predicate on the value (or nullary when `T = void`)
+         * @param pred the predicate
+         * @return `Some(value)` if present and @p pred holds, otherwise `None`
+         */
+        template <typename F>
+            requires detail::MapCallable<F, T>
+        [[nodiscard]] Option filter(F &&pred) &&
+        {
+            if (has_value_)
+            {
+                if constexpr (std::is_void_v<T>)
+                {
+                    if (std::invoke(pred))
+                        return Option::Some();
+                }
+                else
+                {
+                    if (std::invoke(pred, value_))
+                        return Option::Some(std::move(value_));
+                }
+            }
+            return Option::None();
         }
     };
 }
