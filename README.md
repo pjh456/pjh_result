@@ -78,12 +78,13 @@ int main()
 | Category | Members |
 |---|---|
 | Construct | `Ok(v)`, `Ok()` (when `T = void`), `Err(e)` |
-| Inspect | `is_ok()`, `is_err()` |
-| Extract | `unwrap()`, `unwrap_or(v)`, `unwrap_err()`, `unwrap_err_or(e)` |
-| Transform | `map(f)`, `map_err(f)`, `and_then(f)` |
+| Inspect | `is_ok()`, `is_err()`, `is_ok_and(f)`, `is_err_and(f)`, `operator==` |
+| Extract | `unwrap()`, `unwrap_or(v)`, `unwrap_or_else(f)`, `unwrap_or_default()`, `expect(msg)`, `unwrap_err()`, `unwrap_err_or(e)`, `expect_err(msg)` |
+| Transform | `map(f)`, `map_err(f)`, `map_or(def, f)`, `map_or_else(d, f)`, `inspect(f)`, `inspect_err(f)` |
+| Chain | `and_then(f)`, `or_else(f)` |
 | Propagate | `ASSIGN_OR_RETURN(name, expr)`, `TRY(expr)` (from `macros.hpp`) |
 
-`unwrap*` throw `pjh::result::utils::result_helper::bad_result_access` on the wrong state.
+`unwrap*` and `expect*` throw `pjh::result::utils::result_helper::bad_result_access` on the wrong state.
 
 > **Note:** `T` and `E` must be distinct types, and their move constructors must be
 > `noexcept`. Both are enforced at compile time.
