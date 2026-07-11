@@ -5,6 +5,7 @@
 #ifndef INCLUDE_PJH_RESULT_RESULT_HPP
 #define INCLUDE_PJH_RESULT_RESULT_HPP
 
+#include <concepts>
 #include <functional>
 #include <memory>
 #include <new>
@@ -785,6 +786,37 @@ namespace pjh::result
                     return Ret::Ok();
                 else
                     return Ret::Ok(std::move(ok_));
+            }
+
+        public:
+            /**
+             * @brief Equality comparison.
+             *
+             * Two results are equal iff they hold the same alternative with equal contents:
+             * both Ok with equal success values (or both Ok when `T = void`), or both Err with
+             * equal error values.
+             *
+             * Available only when the stored types are equality-comparable. `operator!=` is
+             * synthesized by the compiler (C++20).
+             *
+             * @param a left operand
+             * @param b right operand
+             * @return whether @p a and @p b are equal
+             */
+            friend bool operator==(const Result &a, const Result &b)
+                requires(std::is_void_v<T> || std::equality_comparable<OkT>) &&
+                            std::equality_comparable<E>
+            {
+                if (a.tag_ != b.tag_)
+                    return false;
+                if (a.is_ok())
+                {
+                    if constexpr (std::is_void_v<T>)
+                        return true;
+                    else
+                        return a.ok_ == b.ok_;
+                }
+                return a.err_ == b.err_;
             }
         };
 
