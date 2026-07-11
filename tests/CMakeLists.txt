@@ -10,7 +10,8 @@ set(PJH_RESULT_TEST_SOURCES
     test_combinators.cpp
     test_lifetime.cpp
     test_void.cpp
-    test_macros.cpp)
+    test_macros.cpp
+    test_query.cpp)
 
 add_executable(pjh_result_tests ${PJH_RESULT_TEST_SOURCES})
 target_link_libraries(pjh_result_tests PRIVATE pjh_result doctest)

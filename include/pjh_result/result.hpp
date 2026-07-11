@@ -333,6 +333,41 @@ namespace pjh::result
             /// @brief Whether the result is currently in the Err state.
             bool is_err() const noexcept { return tag_ == detail::Tag::Err; }
 
+            /**
+             * @brief Whether the result is Ok and the success value satisfies @p f.
+             *
+             * When `T = void`, @p f is invoked with no argument.
+             *
+             * @tparam F predicate on the success value (or nullary when `T = void`)
+             * @param f the predicate
+             * @return `is_ok() && bool(f(...))`
+             */
+            template <typename F>
+                requires detail::MapCallable<F, T>
+            [[nodiscard]] bool is_ok_and(F &&f) const
+            {
+                if (!is_ok())
+                    return false;
+                if constexpr (std::is_void_v<T>)
+                    return static_cast<bool>(std::invoke(f));
+                else
+                    return static_cast<bool>(std::invoke(f, ok_));
+            }
+
+            /**
+             * @brief Whether the result is Err and the error value satisfies @p f.
+             *
+             * @tparam F predicate on the error value
+             * @param f the predicate
+             * @return `is_err() && bool(f(error))`
+             */
+            template <typename F>
+                requires std::invocable<F, E>
+            [[nodiscard]] bool is_err_and(F &&f) const
+            {
+                return is_err() && static_cast<bool>(std::invoke(f, err_));
+            }
+
         public:
             /**
              * @brief Unwraps the success value; throws if Err. Available only when `T` is non-void.
@@ -707,6 +742,49 @@ namespace pjh::result
                 }
                 else
                     return Ret::Err(std::move(err_));
+            }
+
+            /**
+             * @brief Chains a fallible recovery (OrElse).
+             *
+             * On Err(e), invokes `f(e)` (which must return a `Result`); on Ok, passes the
+             * success value through unchanged (`Ok()` when `T = void`). Mirror image of `and_then`.
+             *
+             * @tparam F callable taking `E` and returning a `Result`
+             * @param f the recovery operation
+             * @return the return type of `f` (a `Result`)
+             */
+            template <typename F>
+                requires result_helper::ResultType<std::invoke_result_t<F, const E &>>
+            auto or_else(F &&f) const & -> std::invoke_result_t<F, const E &>
+            {
+                using Ret = std::invoke_result_t<F, const E &>;
+                if (is_err())
+                    return std::invoke(f, err_);
+                if constexpr (std::is_void_v<T>)
+                    return Ret::Ok();
+                else
+                    return Ret::Ok(ok_);
+            }
+
+            /**
+             * @brief Chains a fallible recovery (OrElse), rvalue/move overload.
+             *
+             * @tparam F callable taking `E` and returning a `Result`
+             * @param f the recovery operation
+             * @return the return type of `f` (a `Result`)
+             */
+            template <typename F>
+                requires result_helper::ResultType<std::invoke_result_t<F, E>>
+            auto or_else(F &&f) && -> std::invoke_result_t<F, E>
+            {
+                using Ret = std::invoke_result_t<F, E>;
+                if (is_err())
+                    return std::invoke(f, std::move(err_));
+                if constexpr (std::is_void_v<T>)
+                    return Ret::Ok();
+                else
+                    return Ret::Ok(std::move(ok_));
             }
         };
 

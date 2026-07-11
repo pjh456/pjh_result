@@ -59,3 +59,27 @@ TEST_CASE("and_then short-circuits on Err")
     CHECK(r.is_err());
     CHECK(r.unwrap_err() == "e");
 }
+
+TEST_CASE("or_else recovers from Err")
+{
+    auto r = rp::Result<int, std::string>::Err(std::string("e")).or_else(
+        [](const std::string &) { return rp::Result<int, std::string>::Ok(0); });
+    CHECK(r.is_ok());
+    CHECK(r.unwrap() == 0);
+}
+
+TEST_CASE("or_else passes Ok through unchanged")
+{
+    auto r = rp::Result<int, std::string>::Ok(7).or_else(
+        [](const std::string &) { return rp::Result<int, std::string>::Ok(0); });
+    CHECK(r.is_ok());
+    CHECK(r.unwrap() == 7);
+}
+
+TEST_CASE("or_else can change the error type")
+{
+    auto r = rp::Result<int, std::string>::Err(std::string("e")).or_else(
+        [](const std::string &e) { return rp::Result<int, std::size_t>::Err(e.size()); });
+    CHECK(r.is_err());
+    CHECK(r.unwrap_err() == std::size_t{1});
+}
