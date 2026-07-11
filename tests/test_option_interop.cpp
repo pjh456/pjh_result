@@ -22,12 +22,14 @@ TEST_CASE("ok_or converts Some to Ok, None to Err")
 TEST_CASE("ok_or_else lazily computes the error")
 {
     auto s = res::Option<int>::Some(7);
-    auto r = s.ok_or_else([]() { return std::string("missing"); });
+    auto r = s.ok_or_else([]()
+                          { return std::string("missing"); });
     CHECK(r.is_ok());
     CHECK(r.unwrap() == 7);
 
     auto n = res::Option<int>::None();
-    auto e = n.ok_or_else([]() { return std::string("computed"); });
+    auto e = n.ok_or_else([]()
+                          { return std::string("computed"); });
     CHECK(e.is_err());
     CHECK(e.unwrap_err() == "computed");
 }

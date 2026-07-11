@@ -109,6 +109,20 @@ invariant, strong exception guarantee, `T = void` support).
 
 `unwrap`/`expect` throw `pjh::result::bad_result_access` when called on `None`.
 
+## Converting between the two
+
+`Option → Result` is a member (`ok_or` / `ok_or_else`). The reverse direction lives in
+`pjh_result/interop.hpp` as free functions (kept out of the class headers to avoid a
+circular include):
+
+```cpp
+#include "pjh_result/interop.hpp"
+
+res::Result<int, std::string> r = /* ... */;
+res::Option<int> maybe = res::ok(r);   // Ok -> Some, Err -> None (discards error)
+res::Option<std::string> e = res::err(r); // Err -> Some, Ok -> None
+```
+
 ## Examples
 
 Runnable programs under [`examples/`](examples/):
