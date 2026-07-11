@@ -7,6 +7,7 @@
 
 namespace rp = pjh::result::utils;
 using pjh_test::InstanceCounter;
+using pjh_test::ThrowOnCopy;
 
 TEST_CASE("no leak on scope exit")
 {
@@ -62,4 +63,14 @@ TEST_CASE("no leak through move assignment")
         CHECK(b.unwrap().id == 6);
     }
     CHECK(InstanceCounter::live == 0);
+}
+
+TEST_CASE("copy assignment offers strong exception guarantee")
+{
+    auto a = rp::Result<ThrowOnCopy, int>::Ok(ThrowOnCopy{9});
+    auto b = rp::Result<ThrowOnCopy, int>::Err(7);
+
+    CHECK_THROWS(b = a); // 拷贝 a 的 ThrowOnCopy 时抛出
+    CHECK(b.is_err());   // this 保持原状
+    CHECK(b.unwrap_err() == 7);
 }

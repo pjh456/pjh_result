@@ -14,7 +14,7 @@ TEST_CASE("unwrap returns value on Ok, throws on Err")
     CHECK(ok.unwrap() == 1);
 
     auto err = rp::Result<int, std::string>::Err(std::string("e"));
-    CHECK_THROWS_AS(err.unwrap(), bad_access);
+    CHECK_THROWS_AS((void)err.unwrap(), bad_access);
 }
 
 TEST_CASE("unwrap_err returns error on Err, throws on Ok")
@@ -23,7 +23,7 @@ TEST_CASE("unwrap_err returns error on Err, throws on Ok")
     CHECK(err.unwrap_err() == "e");
 
     auto ok = rp::Result<int, std::string>::Ok(1);
-    CHECK_THROWS_AS(ok.unwrap_err(), bad_access);
+    CHECK_THROWS_AS((void)ok.unwrap_err(), bad_access);
 }
 
 TEST_CASE("unwrap_or returns fallback on Err")
