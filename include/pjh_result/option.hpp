@@ -639,6 +639,75 @@ namespace pjh::result
             }
             return Option::None();
         }
+
+    public:
+        /**
+         * @brief Moves the value out (if any), leaving `*this` as `None`.
+         *
+         * @return the previous state as a new `Option` (Some with the moved value, or None)
+         */
+        [[nodiscard]] Option take() noexcept
+        {
+            Option out = Option::None();
+            if (has_value_)
+            {
+                ::new (static_cast<void *>(std::addressof(out.value_))) StoredT(std::move(value_));
+                out.has_value_ = true;
+                destroy_();
+                has_value_ = false;
+            }
+            return out;
+        }
+
+        /**
+         * @brief Sets the option to `Some(val)`, returning the previous state.
+         *        Available only when `T` is non-void.
+         *
+         * @param val the new value
+         * @return the previous `Option` (Some or None)
+         */
+        [[nodiscard]] Option replace(StoredT val)
+            requires(!std::is_void_v<T>)
+        {
+            Option old = take();
+            ::new (static_cast<void *>(std::addressof(value_))) StoredT(std::move(val));
+            has_value_ = true;
+            return old;
+        }
+
+        /**
+         * @brief Sets the option to `Some(val)` (dropping any previous value) and returns a
+         *        reference to it. Available only when `T` is non-void.
+         *
+         * @param val the new value
+         * @return reference to the stored value
+         */
+        StoredT &insert(StoredT val)
+            requires(!std::is_void_v<T>)
+        {
+            destroy_();
+            ::new (static_cast<void *>(std::addressof(value_))) StoredT(std::move(val));
+            has_value_ = true;
+            return value_;
+        }
+
+        /**
+         * @brief Returns a reference to the value, inserting @p val first if currently None.
+         *        Available only when `T` is non-void.
+         *
+         * @param val the value inserted when None
+         * @return reference to the stored value
+         */
+        StoredT &get_or_insert(StoredT val)
+            requires(!std::is_void_v<T>)
+        {
+            if (!has_value_)
+            {
+                ::new (static_cast<void *>(std::addressof(value_))) StoredT(std::move(val));
+                has_value_ = true;
+            }
+            return value_;
+        }
     };
 }
 
