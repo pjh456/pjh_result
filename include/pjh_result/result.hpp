@@ -8,6 +8,7 @@
 #include <functional>
 #include <memory>
 #include <new>
+#include <string>
 #include <type_traits>
 #include <utility>
 
@@ -402,6 +403,100 @@ namespace pjh::result
             }
 
             /**
+             * @brief Unwraps the success value, throwing with a custom message if Err.
+             *        Available only when `T` is non-void.
+             *
+             * @param msg message carried by the thrown exception
+             * @throws result_helper::bad_result_access when currently in the Err state
+             * @return reference to the inner success value
+             */
+            [[nodiscard]] OkT &expect(const std::string &msg) &
+                requires(!std::is_void_v<T>)
+            {
+                if (!is_ok())
+                    throw result_helper::bad_result_access(msg);
+                return ok_;
+            }
+
+            /**
+             * @brief Unwraps the success value (const overload), throwing @p msg if Err.
+             *        Available only when `T` is non-void.
+             *
+             * @param msg message carried by the thrown exception
+             * @throws result_helper::bad_result_access when currently in the Err state
+             * @return const reference to the inner success value
+             */
+            [[nodiscard]] const OkT &expect(const std::string &msg) const &
+                requires(!std::is_void_v<T>)
+            {
+                if (!is_ok())
+                    throw result_helper::bad_result_access(msg);
+                return ok_;
+            }
+
+            /**
+             * @brief Unwraps and moves out the success value, throwing @p msg if Err.
+             *        Available only when `T` is non-void.
+             *
+             * @param msg message carried by the thrown exception
+             * @throws result_helper::bad_result_access when currently in the Err state
+             * @return the moved-out success value
+             */
+            [[nodiscard]] OkT expect(const std::string &msg) &&
+                requires(!std::is_void_v<T>)
+            {
+                if (!is_ok())
+                    throw result_helper::bad_result_access(msg);
+                return std::move(ok_);
+            }
+
+            /**
+             * @brief Asserts the state is Ok, throwing @p msg if Err.
+             *        Available only when `T` is `void`.
+             *
+             * @param msg message carried by the thrown exception
+             * @throws result_helper::bad_result_access when currently in the Err state
+             */
+            void expect(const std::string &msg) const
+                requires std::is_void_v<T>
+            {
+                if (is_err())
+                    throw result_helper::bad_result_access(msg);
+            }
+
+            /**
+             * @brief Unwraps the success value, or computes a fallback from the error if Err.
+             *        Available only when `T` is non-void.
+             *
+             * @tparam F callable taking `E` and returning a value convertible to `T`
+             * @param f fallback producer invoked in the Err state
+             * @return the success value, or `f(error)`
+             */
+            template <typename F>
+                requires(!std::is_void_v<T>) && std::invocable<F, E> &&
+                        std::convertible_to<std::invoke_result_t<F, E>, T>
+            [[nodiscard]] T unwrap_or_else(F &&f) const
+            {
+                if (is_ok())
+                    return ok_;
+                return static_cast<T>(std::invoke(f, err_));
+            }
+
+            /**
+             * @brief Unwraps the success value, or returns a default-constructed `T` if Err.
+             *        Available only when `T` is non-void and default-initializable.
+             *
+             * @return the success value, or `T{}`
+             */
+            [[nodiscard]] T unwrap_or_default() const
+                requires(!std::is_void_v<T>) && std::default_initializable<T>
+            {
+                if (is_ok())
+                    return ok_;
+                return T{};
+            }
+
+            /**
              * @brief Unwraps the error value; throws if Ok.
              *
              * @throws result_helper::bad_result_access when currently in the Ok state
@@ -449,6 +544,48 @@ namespace pjh::result
             [[nodiscard]] E unwrap_err_or(E err) const
             {
                 return is_err() ? err_ : std::move(err);
+            }
+
+            /**
+             * @brief Unwraps the error value, throwing with a custom message if Ok.
+             *
+             * @param msg message carried by the thrown exception
+             * @throws result_helper::bad_result_access when currently in the Ok state
+             * @return reference to the inner error value
+             */
+            [[nodiscard]] E &expect_err(const std::string &msg) &
+            {
+                if (!is_err())
+                    throw result_helper::bad_result_access(msg);
+                return err_;
+            }
+
+            /**
+             * @brief Unwraps the error value (const overload), throwing @p msg if Ok.
+             *
+             * @param msg message carried by the thrown exception
+             * @throws result_helper::bad_result_access when currently in the Ok state
+             * @return const reference to the inner error value
+             */
+            [[nodiscard]] const E &expect_err(const std::string &msg) const &
+            {
+                if (!is_err())
+                    throw result_helper::bad_result_access(msg);
+                return err_;
+            }
+
+            /**
+             * @brief Unwraps and moves out the error value, throwing @p msg if Ok.
+             *
+             * @param msg message carried by the thrown exception
+             * @throws result_helper::bad_result_access when currently in the Ok state
+             * @return the moved-out error value
+             */
+            [[nodiscard]] E expect_err(const std::string &msg) &&
+            {
+                if (!is_err())
+                    throw result_helper::bad_result_access(msg);
+                return std::move(err_);
             }
 
         public:
