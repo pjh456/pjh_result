@@ -83,3 +83,50 @@ TEST_CASE("or_else can change the error type")
     CHECK(r.is_err());
     CHECK(r.unwrap_err() == std::size_t{1});
 }
+
+TEST_CASE("map_or returns transform on Ok, default on Err")
+{
+    auto ok = rp::Result<int, std::string>::Ok(10);
+    CHECK(ok.map_or(-1, [](int v) { return v * 2; }) == 20);
+
+    auto err = rp::Result<int, std::string>::Err(std::string("e"));
+    CHECK(err.map_or(-1, [](int v) { return v * 2; }) == -1);
+}
+
+TEST_CASE("map_or_else picks transform or error fallback")
+{
+    auto ok = rp::Result<int, std::string>::Ok(10);
+    CHECK(ok.map_or_else([](const std::string &) { return -1; }, [](int v) { return v * 2; }) == 20);
+
+    auto err = rp::Result<int, std::string>::Err(std::string("abc"));
+    CHECK(err.map_or_else([](const std::string &e) { return static_cast<int>(e.size()); },
+                          [](int v) { return v * 2; }) == 3);
+}
+
+TEST_CASE("inspect observes Ok value and returns self")
+{
+    int seen = 0;
+    auto r = rp::Result<int, std::string>::Ok(7);
+    const auto &same = r.inspect([&](int v) { seen = v; });
+    CHECK(seen == 7);
+    CHECK(&same == &r);
+
+    seen = 0;
+    auto e = rp::Result<int, std::string>::Err(std::string("e"));
+    e.inspect([&](int v) { seen = v; });
+    CHECK(seen == 0); // not invoked on Err
+}
+
+TEST_CASE("inspect_err observes Err value and returns self")
+{
+    std::string seen;
+    auto e = rp::Result<int, std::string>::Err(std::string("boom"));
+    e.inspect_err([&](const std::string &v) { seen = v; });
+    CHECK(seen == "boom");
+
+    seen.clear();
+    auto ok = rp::Result<int, std::string>::Ok(1);
+    ok.inspect_err([&](const std::string &v) { seen = v; });
+    CHECK(seen.empty()); // not invoked on Ok
+}
+

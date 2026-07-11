@@ -695,6 +695,100 @@ namespace pjh::result
                 }
             }
 
+            /**
+             * @brief Returns `f(success value)` if Ok, otherwise the provided default.
+             *
+             * Unlike `map`, this collapses to a plain value `U` rather than a `Result`.
+             * When `T = void`, `f()` is called.
+             *
+             * @tparam F callable producing `U` from the success value (or nullary when `T = void`)
+             * @param def value returned when in the Err state
+             * @param f transform applied to the success value
+             * @return `f(...)` if Ok, otherwise @p def
+             */
+            template <typename F>
+                requires detail::MapCallable<F, T> && (!std::is_void_v<detail::map_result_t<F, T>>)
+            [[nodiscard]] detail::map_result_t<F, T> map_or(detail::map_result_t<F, T> def, F &&f) const
+            {
+                if (is_ok())
+                {
+                    if constexpr (std::is_void_v<T>)
+                        return std::invoke(f);
+                    else
+                        return std::invoke(f, ok_);
+                }
+                return def;
+            }
+
+            /**
+             * @brief Returns `f(success value)` if Ok, otherwise `d(error)`.
+             *
+             * Collapses to a plain value `U`. When `T = void`, `f()` is called.
+             *
+             * @tparam D callable producing `U` from the error
+             * @tparam F callable producing `U` from the success value (or nullary when `T = void`)
+             * @param d fallback applied to the error
+             * @param f transform applied to the success value
+             * @return `f(...)` if Ok, otherwise `d(error)`
+             */
+            template <typename D, typename F>
+                requires detail::MapCallable<F, T> && std::invocable<D, E> &&
+                         (!std::is_void_v<detail::map_result_t<F, T>>) &&
+                         std::convertible_to<std::invoke_result_t<D, E>, detail::map_result_t<F, T>>
+            [[nodiscard]] detail::map_result_t<F, T> map_or_else(D &&d, F &&f) const
+            {
+                using U = detail::map_result_t<F, T>;
+                if (is_ok())
+                {
+                    if constexpr (std::is_void_v<T>)
+                        return std::invoke(f);
+                    else
+                        return std::invoke(f, ok_);
+                }
+                return static_cast<U>(std::invoke(d, err_));
+            }
+
+            /**
+             * @brief Invokes @p f on the success value if Ok, then returns `*this` unchanged.
+             *
+             * Useful for side effects (e.g. logging) in a chain. When `T = void`, `f()` is called.
+             *
+             * @tparam F callable observing the success value (or nullary when `T = void`)
+             * @param f the observer
+             * @return const reference to `*this`
+             * @warning Returns a reference to `*this`; do not call on a temporary and keep the result.
+             */
+            template <typename F>
+                requires detail::MapCallable<F, T>
+            const Result &inspect(F &&f) const &
+            {
+                if (is_ok())
+                {
+                    if constexpr (std::is_void_v<T>)
+                        std::invoke(f);
+                    else
+                        std::invoke(f, ok_);
+                }
+                return *this;
+            }
+
+            /**
+             * @brief Invokes @p f on the error value if Err, then returns `*this` unchanged.
+             *
+             * @tparam F callable observing the error value
+             * @param f the observer
+             * @return const reference to `*this`
+             * @warning Returns a reference to `*this`; do not call on a temporary and keep the result.
+             */
+            template <typename F>
+                requires std::invocable<F, E>
+            const Result &inspect_err(F &&f) const &
+            {
+                if (is_err())
+                    std::invoke(f, err_);
+                return *this;
+            }
+
         public:
             /**
              * @brief Chains a fallible operation (FlatMap / AndThen).
