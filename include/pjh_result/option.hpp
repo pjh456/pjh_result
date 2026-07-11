@@ -31,9 +31,6 @@ namespace pjh::result
         {
         };
 
-        /// @brief Satisfied when `X` (ignoring cvref) is an `Option`.
-        template <typename X>
-        concept OptionType = is_option<std::remove_cvref_t<X>>::value;
     }
 
     /**
@@ -247,6 +244,74 @@ namespace pjh::result
             requires(!std::is_void_v<T>) && std::equality_comparable<StoredT>
         {
             return has_value_ && value_ == val;
+        }
+
+        /**
+         * @brief Transposes an `Option<Result<U, E>>` into `Result<Option<U>, E>`.
+         *
+         * `Some(Ok(u))` becomes `Ok(Some(u))`, `Some(Err(e))` becomes `Err(e)`,
+         * `None` becomes `Ok(None)`.
+         *
+         * @tparam V Result type (inferred from T being a Result)
+         * @return the transposed `Result`
+         */
+        template <typename V = T>
+            requires detail::ResultType<V>
+        [[nodiscard]] auto transpose() const &
+            -> Result<Option<detail::result_value_t<V>>, detail::result_error_t<V>>
+        {
+            using InnerV = detail::result_value_t<V>;
+            using InnerE = detail::result_error_t<V>;
+            using Out = Result<Option<InnerV>, InnerE>;
+
+            if (!has_value_)
+                return Out::Ok(Option<InnerV>::None());
+
+            if (value_.is_ok())
+            {
+                if constexpr (std::is_void_v<InnerV>)
+                {
+                    value_.unwrap();
+                    return Out::Ok(Option<void>::Some());
+                }
+                else
+                {
+                    return Out::Ok(Option<InnerV>::Some(value_.unwrap()));
+                }
+            }
+            return Out::Err(value_.unwrap_err());
+        }
+
+        /// @overload
+        template <typename V = T>
+            requires detail::ResultType<V>
+        [[nodiscard]] auto transpose() &&
+            -> Result<Option<detail::result_value_t<V>>, detail::result_error_t<V>>
+        {
+            using InnerV = detail::result_value_t<V>;
+            using InnerE = detail::result_error_t<V>;
+            using Out = Result<Option<InnerV>, InnerE>;
+
+            if (!has_value_)
+                return Out::Ok(Option<InnerV>::None());
+
+            auto inner = std::move(value_);
+            destroy_();
+            has_value_ = false;
+
+            if (inner.is_ok())
+            {
+                if constexpr (std::is_void_v<InnerV>)
+                {
+                    std::move(inner).unwrap();
+                    return Out::Ok(Option<void>::Some());
+                }
+                else
+                {
+                    return Out::Ok(Option<InnerV>::Some(std::move(inner).unwrap()));
+                }
+            }
+            return Out::Err(std::move(inner).unwrap_err());
         }
 
     public:

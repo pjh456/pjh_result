@@ -42,6 +42,12 @@ namespace pjh::result::detail
     concept ValidResultTypes =
         !std::same_as<std::remove_cvref_t<T>,
                       std::remove_cvref_t<E>>;
+
+    /// @brief Satisfied when `X` exposes a `value_type` member (heuristic for `Option`-like types).
+    template <typename X>
+    concept OptionType = requires {
+        typename std::remove_cvref_t<X>::value_type;
+    };
 }
 
 #endif // INCLUDE_PJH_RESULT_DETAIL_TRAITS_HPP

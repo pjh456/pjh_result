@@ -18,6 +18,9 @@
 
 namespace pjh::result
 {
+    template <typename T>
+    class Option;
+
     /// @brief Placeholder type for the success branch when `T = void`.
     struct Unit
     {
@@ -987,6 +990,71 @@ namespace pjh::result
             auto e = std::move(err_);
             tag_ = detail::Tag::Moved;
             return Result<detail::result_value_t<U>, E>::Err(std::move(e));
+        }
+
+        /**
+         * @brief Transposes a `Result<Option<U>, E>` into `Option<Result<U, E>>`.
+         *
+         * `Ok(Some(u))` becomes `Some(Ok(u))`, `Ok(None)` becomes `None`,
+         * `Err(e)` becomes `Some(Err(e))`.
+         *
+         * @tparam V Option type (inferred from T being an Option)
+         * @return the transposed `Option`
+         */
+        template <typename V = T>
+            requires detail::OptionType<V>
+        [[nodiscard]] auto transpose() const &
+            -> Option<Result<typename V::value_type, E>>
+        {
+            using InnerV = typename V::value_type;
+            using Out = Option<Result<InnerV, E>>;
+
+            if (is_ok())
+            {
+                if (ok_.is_some())
+                {
+                    if constexpr (std::is_void_v<InnerV>)
+                        return Out::Some(Result<void, E>::Ok());
+                    else
+                        return Out::Some(Result<InnerV, E>::Ok(ok_.unwrap()));
+                }
+                return Out::None();
+            }
+            return Out::Some(Result<InnerV, E>::Err(err_));
+        }
+
+        /// @overload
+        template <typename V = T>
+            requires detail::OptionType<V>
+        [[nodiscard]] auto transpose() &&
+            -> Option<Result<typename V::value_type, E>>
+        {
+            using InnerV = typename V::value_type;
+            using Out = Option<Result<InnerV, E>>;
+
+            if (is_ok())
+            {
+                if (ok_.is_some())
+                {
+                    if constexpr (std::is_void_v<InnerV>)
+                    {
+                        std::move(ok_).unwrap();
+                        tag_ = detail::Tag::Moved;
+                        return Out::Some(Result<void, E>::Ok());
+                    }
+                    else
+                    {
+                        auto v = std::move(ok_).unwrap();
+                        tag_ = detail::Tag::Moved;
+                        return Out::Some(Result<InnerV, E>::Ok(std::move(v)));
+                    }
+                }
+                tag_ = detail::Tag::Moved;
+                return Out::None();
+            }
+            auto e = std::move(err_);
+            tag_ = detail::Tag::Moved;
+            return Out::Some(Result<InnerV, E>::Err(std::move(e)));
         }
 
     public:
