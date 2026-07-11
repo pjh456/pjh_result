@@ -257,8 +257,7 @@ namespace pjh::result
          */
         template <typename V = T>
             requires detail::ResultType<V>
-        [[nodiscard]] auto transpose() const &
-            -> Result<Option<detail::result_value_t<V>>, detail::result_error_t<V>>
+        [[nodiscard]] auto transpose() const & -> Result<Option<detail::result_value_t<V>>, detail::result_error_t<V>>
         {
             using InnerV = detail::result_value_t<V>;
             using InnerE = detail::result_error_t<V>;
@@ -285,8 +284,7 @@ namespace pjh::result
         /// @overload
         template <typename V = T>
             requires detail::ResultType<V>
-        [[nodiscard]] auto transpose() &&
-            -> Result<Option<detail::result_value_t<V>>, detail::result_error_t<V>>
+        [[nodiscard]] auto transpose() && -> Result<Option<detail::result_value_t<V>>, detail::result_error_t<V>>
         {
             using InnerV = detail::result_value_t<V>;
             using InnerE = detail::result_error_t<V>;
@@ -312,6 +310,87 @@ namespace pjh::result
                 }
             }
             return Out::Err(std::move(inner).unwrap_err());
+        }
+
+        /**
+         * @brief Zips two Options into a single Option of a pair.
+         *
+         * `Some(a)` with `Some(b)` becomes `Some((a, b))`; otherwise `None`.
+         *
+         * @tparam U the other Option's value type
+         * @param other the second Option
+         * @return `Option<std::pair<T, U>>`
+         */
+        template <typename U>
+            requires(!std::is_void_v<T>) && (!std::is_void_v<U>)
+        [[nodiscard]] Option<std::pair<T, U>> zip(Option<U> other) const
+        {
+            if (has_value_ && other.has_value_)
+                return Option<std::pair<T, U>>::Some(std::make_pair(value_, other.value_));
+            return Option<std::pair<T, U>>::None();
+        }
+
+        /// @overload
+        template <typename U>
+            requires(!std::is_void_v<T>) && (!std::is_void_v<U>)
+        [[nodiscard]] Option<std::pair<T, U>> zip(Option<U> other) &&
+        {
+            if (has_value_ && other.has_value_)
+            {
+                auto p = std::make_pair(std::move(value_), std::move(other.value_));
+                destroy_();
+                has_value_ = false;
+                return Option<std::pair<T, U>>::Some(std::move(p));
+            }
+            if (has_value_)
+            {
+                destroy_();
+                has_value_ = false;
+            }
+            return Option<std::pair<T, U>>::None();
+        }
+
+        /**
+         * @brief Zips two Options with a combiner function.
+         *
+         * `Some(a)` with `Some(b)` becomes `Some(f(a, b))`; otherwise `None`.
+         *
+         * @tparam U the other Option's value type
+         * @tparam F callable `(T, U) -> R`
+         * @param other the second Option
+         * @param f the combiner
+         * @return `Option<R>`
+         */
+        template <typename U, typename F>
+            requires(!std::is_void_v<T>) && (!std::is_void_v<U>)
+        [[nodiscard]] auto zip_with(Option<U> other, F &&f) const
+            -> Option<decltype(std::invoke(f, value_, other.value_))>
+        {
+            using R = decltype(std::invoke(f, value_, other.value_));
+            if (has_value_ && other.has_value_)
+                return Option<R>::Some(std::invoke(f, value_, other.value_));
+            return Option<R>::None();
+        }
+
+        /// @overload
+        template <typename U, typename F>
+            requires(!std::is_void_v<T>) && (!std::is_void_v<U>)
+        [[nodiscard]] auto zip_with(Option<U> other, F &&f) && -> Option<decltype(std::invoke(f, std::move(value_), std::move(other.value_)))>
+        {
+            using R = decltype(std::invoke(f, std::move(value_), std::move(other.value_)));
+            if (has_value_ && other.has_value_)
+            {
+                auto r = Option<R>::Some(std::invoke(f, std::move(value_), std::move(other.value_)));
+                destroy_();
+                has_value_ = false;
+                return r;
+            }
+            if (has_value_)
+            {
+                destroy_();
+                has_value_ = false;
+            }
+            return Option<R>::None();
         }
 
     public:

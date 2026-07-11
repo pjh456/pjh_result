@@ -115,12 +115,16 @@ TEST_CASE("filter keeps or drops the value")
 TEST_CASE("filter rvalue works with move-only type")
 {
     auto o = res::Option<std::unique_ptr<int>>::Some(std::unique_ptr<int>(new int(42)));
-    auto kept = std::move(o).filter([](const std::unique_ptr<int> &p) { return *p > 0; });
+    auto kept = std::move(o).filter(
+        [](const std::unique_ptr<int> &p)
+        { return *p > 0; });
     CHECK(kept.is_some());
     CHECK(*kept.unwrap() == 42);
 
     auto empty = res::Option<std::unique_ptr<int>>::None();
-    auto none = std::move(empty).filter([](const std::unique_ptr<int> &) { return true; });
+    auto none = std::move(empty).filter(
+        [](const std::unique_ptr<int> &)
+        { return true; });
     CHECK(none.is_none());
 }
 
@@ -161,4 +165,62 @@ TEST_CASE("flatten rvalue on None returns None")
     auto outer = res::Option<res::Option<int>>::None();
     auto flat = std::move(outer).flatten();
     CHECK(flat.is_none());
+}
+
+TEST_CASE("zip pairs two Somes")
+{
+    auto a = res::Option<int>::Some(1);
+    auto b = res::Option<int>::Some(2);
+    auto z = a.zip(b);
+    CHECK(z.is_some());
+    CHECK(z.unwrap() == std::make_pair(1, 2));
+}
+
+TEST_CASE("zip with None returns None")
+{
+    auto a = res::Option<int>::Some(1);
+    auto b = res::Option<int>::None();
+    CHECK(a.zip(b).is_none());
+    CHECK(res::Option<int>::None().zip(a).is_none());
+}
+
+TEST_CASE("zip rvalue moves values")
+{
+    auto a = res::Option<std::unique_ptr<int>>::Some(std::unique_ptr<int>(new int(7)));
+    auto b = res::Option<std::unique_ptr<int>>::Some(std::unique_ptr<int>(new int(8)));
+    auto z = std::move(a).zip(std::move(b));
+    CHECK(z.is_some());
+    CHECK(*z.unwrap().first == 7);
+    CHECK(*z.unwrap().second == 8);
+}
+
+TEST_CASE("zip_with combines with a function")
+{
+    auto a = res::Option<int>::Some(3);
+    auto b = res::Option<int>::Some(4);
+    auto z = a.zip_with(b, [](int x, int y)
+                        { return x + y; });
+    CHECK(z.is_some());
+    CHECK(z.unwrap() == 7);
+}
+
+TEST_CASE("zip_with with None returns None")
+{
+    auto a = res::Option<int>::Some(3);
+    auto b = res::Option<int>::None();
+    CHECK(a.zip_with(b, [](int x, int y)
+                     { return x + y; })
+              .is_none());
+}
+
+TEST_CASE("zip_with rvalue moves values into combiner")
+{
+    auto a = res::Option<std::string>::Some(std::string("hello"));
+    auto b = res::Option<std::string>::Some(std::string("world"));
+    auto z = std::move(a).zip_with(
+        std::move(b),
+        [](std::string x, std::string y)
+        { return x + " " + y; });
+    CHECK(z.is_some());
+    CHECK(z.unwrap() == "hello world");
 }
