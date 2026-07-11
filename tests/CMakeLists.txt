@@ -12,7 +12,11 @@ set(PJH_RESULT_TEST_SOURCES
     test_void.cpp
     test_macros.cpp
     test_query.cpp
-    test_compare.cpp)
+    test_compare.cpp
+    test_option_construct.cpp
+    test_option_unwrap.cpp
+    test_option_lifetime.cpp
+    test_option_void.cpp)
 
 add_executable(pjh_result_tests ${PJH_RESULT_TEST_SOURCES})
 target_link_libraries(pjh_result_tests PRIVATE pjh_result doctest)
@@ -31,3 +35,12 @@ add_test(
     NAME compile_fail.throwing_move
     COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target compile_fail_throwing_move)
 set_tests_properties(compile_fail.throwing_move PROPERTIES WILL_FAIL TRUE)
+
+add_executable(compile_fail_option_throwing_move EXCLUDE_FROM_ALL compile_fail/option_throwing_move.cpp)
+target_link_libraries(compile_fail_option_throwing_move PRIVATE pjh_result)
+target_include_directories(compile_fail_option_throwing_move PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+
+add_test(
+    NAME compile_fail.option_throwing_move
+    COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target compile_fail_option_throwing_move)
+set_tests_properties(compile_fail.option_throwing_move PROPERTIES WILL_FAIL TRUE)
