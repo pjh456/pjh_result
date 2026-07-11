@@ -66,8 +66,8 @@ namespace pjh::result
             explicit Result(const T &val) : data(val) {}
             explicit Result(const E &err) : data(err) {}
 
-            explicit Result(T &&val) noexcept : data(std::move(val)) {}
-            explicit Result(E &&err) noexcept : data(std::move(err)) {}
+            explicit Result(T &&val) noexcept(std::is_nothrow_move_constructible_v<T>) : data(std::move(val)) {}
+            explicit Result(E &&err) noexcept(std::is_nothrow_move_constructible_v<E>) : data(std::move(err)) {}
 
             Result(const Result &)
                 requires std::copy_constructible<T> &&
@@ -351,7 +351,7 @@ namespace pjh::result
             explicit Result(std::monostate) : data(std::monostate{}) {}
             explicit Result(const E &err) : data(err) {}
 
-            explicit Result(E &&err) noexcept : data(std::move(err)) {}
+            explicit Result(E &&err) noexcept(std::is_nothrow_move_constructible_v<E>) : data(std::move(err)) {}
 
             Result(const Result &)
                 requires std::copy_constructible<E>

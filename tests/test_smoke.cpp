@@ -7,7 +7,17 @@
 
 using pjh::result::utils::Result;
 
-int main() {
+// bug3: 移动值构造须条件化 noexcept —— throwing-move 类型下不得声称 noexcept
+struct ThrowMove
+{
+    ThrowMove() = default;
+    ThrowMove(ThrowMove &&) {}
+};
+static_assert(std::is_nothrow_constructible_v<Result<int, std::string>, int &&>);
+static_assert(!std::is_nothrow_constructible_v<Result<ThrowMove, int>, ThrowMove &&>);
+
+int main()
+{
     auto ok = Result<int, std::string>::Ok(42);
     assert(ok.is_ok());
     assert(!ok.is_err());
@@ -17,7 +27,8 @@ int main() {
     assert(err.is_err());
     assert(err.unwrap_err() == "boom");
 
-    auto mapped = Result<int, std::string>::Ok(10).map([](int v) { return v * 2; });
+    auto mapped = Result<int, std::string>::Ok(10).map([](int v)
+                                                       { return v * 2; });
     assert(mapped.unwrap() == 20);
 
     // bug1: unwrap_or 曾返回临时参数的悬垂引用；按值收参后临时值须存活
