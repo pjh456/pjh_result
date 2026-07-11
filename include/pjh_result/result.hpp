@@ -815,7 +815,7 @@ namespace pjh::result
          * @warning Returns a reference to `*this`; do not call on a temporary and keep the result.
          */
         template <typename F>
-            requires std::invocable<F, E>
+            requires std::invocable<F, const E &>
         const Result &inspect_err(F &&f) const &
         {
             if (is_err())

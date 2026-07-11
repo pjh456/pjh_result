@@ -153,9 +153,20 @@ TEST_CASE("inspect_err observes Err value and returns self")
 
     seen.clear();
     auto ok = res::Result<int, std::string>::Ok(1);
-    ok.inspect_err([&](const std::string &v)
-                   { seen = v; });
+    ok.inspect_err(
+        [&](const std::string &v)
+        { seen = v; });
     CHECK(seen.empty()); // not invoked on Ok
+}
+
+TEST_CASE("inspect_err accepts callable taking E & (non-const lvalue ref)")
+{
+    auto e = res::Result<int, std::string>::Err(std::string("boom"));
+    std::size_t n = 0;
+    e.inspect_err(
+        [&](const std::string &v)
+        { n = v.size(); });
+    CHECK(n == 4);
 }
 
 TEST_CASE("map throws on moved Result")
