@@ -113,3 +113,7 @@ Toggle with `-DPJH_RESULT_BUILD_TESTS=ON/OFF` and `-DPJH_RESULT_BUILD_EXAMPLES=O
 (both default to ON when this is the top-level project). Tests use
 [doctest](https://github.com/doctest/doctest), vendored as a git submodule under
 `tests/third_party/` — run `git submodule update --init --depth 1` first.
+
+## License
+
+MIT — see [LICENSE](LICENSE).
