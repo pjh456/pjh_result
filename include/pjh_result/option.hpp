@@ -724,7 +724,7 @@ namespace pjh::result
          * @return `Result<T, E>`
          */
         template <typename E>
-            requires std::constructible_from<E, const E &>
+            requires std::move_constructible<E>
         [[nodiscard]] Result<T, E> ok_or(E err) const
         {
             if (has_value_)
