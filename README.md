@@ -66,9 +66,10 @@ IntResult sum_positive(int a, int b)
 
 int main()
 {
-    auto r = parse_positive(4)
-                 .map([](int x) { return x * 2; })
-                 .and_then([](int x) { return sum_positive(x, 1); });
+    auto r = 
+        parse_positive(4)
+        .map([](int x) { return x * 2; })
+        .and_then([](int x) { return sum_positive(x, 1); });
 
     if (r.is_ok())
         return r.unwrap();
@@ -76,15 +77,16 @@ int main()
 }
 ```
 
-## API at a glance
+## Result API at a glance
 
 | Category | Members |
 |---|---|
 | Construct | `Ok(v)`, `Ok()` (when `T = void`), `Err(e)` |
-| Inspect | `is_ok()`, `is_err()`, `is_ok_and(f)`, `is_err_and(f)`, `operator==` |
+| Inspect & query | `is_ok()`, `is_err()`, `is_moved()`, `is_ok_and(f)`, `is_err_and(f)`, `contains(v)`, `contains_err(e)`, `operator==` |
 | Extract | `unwrap()`, `unwrap_or(v)`, `unwrap_or_else(f)`, `unwrap_or_default()`, `expect(msg)`, `unwrap_err()`, `unwrap_err_or(e)`, `expect_err(msg)` |
 | Transform | `map(f)`, `map_err(f)`, `map_or(def, f)`, `map_or_else(d, f)`, `inspect(f)`, `inspect_err(f)` |
-| Chain | `and_then(f)`, `or_else(f)` |
+| Chain & flatten | `and_then(f)`, `or_else(f)`, `flatten()` |
+| Transpose | `transpose()` → `Option<Result<U,E>>` ↔ `Result<Option<U>,E>` |
 | Propagate | `ASSIGN_OR_RETURN(name, expr)`, `TRY(expr)` (from `macros.hpp`) |
 
 `unwrap*` and `expect*` throw `pjh::result::bad_result_access` on the wrong state.
@@ -92,7 +94,7 @@ int main()
 > **Note:** `T` and `E` must be distinct types, and their move constructors must be
 > `noexcept`. Both are enforced at compile time.
 
-## Option at a glance
+## Option API at a glance
 
 `pjh::result::Option<T>` mirrors the same design (hand-written storage, `nothrow`-move
 invariant, strong exception guarantee, `T = void` support).
@@ -100,12 +102,14 @@ invariant, strong exception guarantee, `T = void` support).
 | Category | Members |
 |---|---|
 | Construct | `Some(v)`, `Some()` (when `T = void`), `None()` |
-| Inspect | `is_some()`, `is_none()`, `is_some_and(f)`, `operator==` |
+| Inspect & query | `is_some()`, `is_none()`, `is_some_and(f)`, `is_none_and(f)`, `contains(v)`, `operator==` |
 | Extract | `unwrap()`, `unwrap_or(v)`, `unwrap_or_else(f)`, `unwrap_or_default()`, `expect(msg)` |
 | Transform | `map(f)`, `map_or(def, f)`, `map_or_else(d, f)`, `inspect(f)` |
-| Chain | `and_then(f)`, `or_else(f)`, `filter(pred)` |
-| Mutate | `take()`, `replace(v)`, `insert(v)`, `get_or_insert(v)` |
+| Chain, flatten & zip | `and_then(f)`, `or_else(f)`, `filter(pred)`, `flatten()`, `zip(Option)`, `zip_with(Option, f)` |
+| Exclusive or | `x_or(Option)` |
+| Mutate | `take()`, `replace(v)`, `insert(v)`, `get_or_insert(v)`, `get_or_insert_default()`, `get_or_insert_with(f)` |
 | To Result | `ok_or(e)`, `ok_or_else(f)` |
+| Transpose | `transpose()` → `Result<Option<U>,E>` ↔ `Option<Result<U,E>>` |
 
 `unwrap`/`expect` throw `pjh::result::bad_result_access` when called on `None`.
 
