@@ -1,5 +1,6 @@
 #include <cassert>
 #include <string>
+#include <vector>
 
 #include "pjh_result/macros.hpp"
 #include "pjh_result/result.hpp"
@@ -24,6 +25,15 @@ int main() {
     assert(e.unwrap_or(std::string("fallback")) == "fallback");
     auto o2 = Result<std::string, int>::Ok(std::string("hi"));
     assert(o2.unwrap_or(std::string("x")) == "hi");
+
+    // bug2: explicit 拷贝/移动构造曾挡住左值拷贝初始化与容器存储
+    auto src = Result<int, std::string>::Ok(7);
+    auto copy = src;
+    assert(copy.unwrap() == 7);
+    std::vector<Result<int, std::string>> v;
+    v.push_back(Result<int, std::string>::Ok(1));
+    v.push_back(src);
+    assert(v.size() == 2 && v[0].unwrap() == 1 && v[1].unwrap() == 7);
 
     return 0;
 }

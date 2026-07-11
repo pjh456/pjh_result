@@ -69,7 +69,7 @@ namespace pjh::result
             explicit Result(T &&val) noexcept : data(std::move(val)) {}
             explicit Result(E &&err) noexcept : data(std::move(err)) {}
 
-            explicit Result(const Result &)
+            Result(const Result &)
                 requires std::copy_constructible<T> &&
                              std::copy_constructible<E>
             = default;
@@ -79,7 +79,7 @@ namespace pjh::result
                             (std::is_copy_assignable_v<E>)
             = default;
 
-            explicit Result(Result &&) noexcept = default;
+            Result(Result &&) noexcept = default;
             Result &operator=(Result &&) noexcept = default;
 
             template <typename G>
@@ -353,7 +353,7 @@ namespace pjh::result
 
             explicit Result(E &&err) noexcept : data(std::move(err)) {}
 
-            explicit Result(const Result &)
+            Result(const Result &)
                 requires std::copy_constructible<E>
             = default;
 
@@ -361,7 +361,7 @@ namespace pjh::result
                 requires(std::is_copy_assignable_v<E>)
             = default;
 
-            explicit Result(Result &&) noexcept = default;
+            Result(Result &&) noexcept = default;
             Result &operator=(Result &&) noexcept = default;
 
             template <typename G>
