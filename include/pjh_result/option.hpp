@@ -237,6 +237,18 @@ namespace pjh::result
             return !has_value_ && static_cast<bool>(std::invoke(f));
         }
 
+        /**
+         * @brief Whether the option is Some and the value equals @p val.
+         *
+         * @param val the value to compare against
+         * @return `is_some() && value == val`
+         */
+        [[nodiscard]] bool contains(const StoredT &val) const
+            requires(!std::is_void_v<T>) && std::equality_comparable<StoredT>
+        {
+            return has_value_ && value_ == val;
+        }
+
     public:
         /**
          * @brief Unwraps the contained value; throws if None. Available only when `T` is non-void.

@@ -75,3 +75,21 @@ TEST_CASE("is_none_and checks None")
         []
         { return false; }));
 }
+
+TEST_CASE("contains matches Some value")
+{
+    auto some = res::Option<int>::Some(42);
+    CHECK(some.contains(42));
+    CHECK_FALSE(some.contains(0));
+
+    auto none = res::Option<int>::None();
+    CHECK_FALSE(none.contains(42));
+}
+
+TEST_CASE("contains with string")
+{
+    auto some = res::Option<std::string>::Some(std::string("hello"));
+    CHECK(some.contains(std::string("hello")));
+    CHECK_FALSE(some.contains(std::string("world")));
+    CHECK_FALSE(res::Option<std::string>::None().contains(std::string("x")));
+}

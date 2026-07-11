@@ -379,6 +379,30 @@ namespace pjh::result
             return is_err() && static_cast<bool>(std::invoke(f, err_));
         }
 
+        /**
+         * @brief Whether the result is Ok and the success value equals @p val.
+         *
+         * @param val the value to compare against
+         * @return `is_ok() && ok_ == val`
+         */
+        [[nodiscard]] bool contains(const OkT &val) const
+            requires(!std::is_void_v<T>) && std::equality_comparable<OkT>
+        {
+            return is_ok() && ok_ == val;
+        }
+
+        /**
+         * @brief Whether the result is Err and the error value equals @p val.
+         *
+         * @param val the error to compare against
+         * @return `is_err() && err_ == val`
+         */
+        [[nodiscard]] bool contains_err(const E &val) const
+            requires std::equality_comparable<E>
+        {
+            return is_err() && err_ == val;
+        }
+
     public:
         /**
          * @brief Unwraps the success value; throws if Err. Available only when `T` is non-void.
