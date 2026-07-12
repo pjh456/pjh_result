@@ -3,21 +3,19 @@
 A header-only, C++20 port of Rust's `Result<T, E>` and `Option<T>` for expressive,
 exception-light error handling.
 
-`Result<T, E>` holds **either** a success value `T` **or** an error `E` — never both, never
-neither. It forces callers to acknowledge failure instead of silently ignoring it.
-`Option<T>` holds **either** a value (`Some`) **or** nothing (`None`).
+`Result<T, E>` is in exactly one of three states: **Ok** (value `T`), **Err** (error `E`), or
+**Moved** (after an rvalue unwrap/extract). `Option<T>` holds **either** a value (`Some`)
+**or** nothing (`None`). Both use hand-written tagged-union storage — no `std::variant`,
+no `valueless_by_exception`.
 
 ## Features
 
-- **No `std::variant`** — hand-written tagged-union storage.
-- **No invalid "third state"** — `is_ok()` and `is_err()` are always complementary
-  (no `valueless_by_exception`).
-- **Strong exception guarantee** on assignment; a `nothrow`-move invariant is enforced at
-  compile time via `static_assert`.
-- **`T = void` support** — for fallible operations that return no value.
-- **Monadic combinators** — `map`, `map_err`, `and_then`.
+- **Three-state `Result`** — Ok / Err / Moved (moved-from), detectable via `is_moved()`.
+- **`T = void` support** — for fallible operations or optional signals that carry no value.
+- **Monadic combinators** — `map`, `map_err`, `and_then`, `or_else`, `flatten`, `filter`, `zip`, `zip_with`, `x_or`, `transpose`.
+- **Rich query API** — `is_ok_and`, `is_err_and`, `is_none_and`, `contains`, `contains_err`.
 - **Rust `?`-style propagation** — the `ASSIGN_OR_RETURN` and `TRY` macros.
-- **`Option<T>` too** — the same design, with `Some`/`None` and `Option`→`Result` bridging.
+- **Strong exception guarantee** on assignment; `nothrow`-move invariant enforced at compile time.
 - **Header-only**, no runtime dependencies.
 
 ## Requirements
@@ -89,15 +87,14 @@ int main()
 | Transpose | `transpose()` → `Option<Result<U,E>>` ↔ `Result<Option<U>,E>` |
 | Propagate | `ASSIGN_OR_RETURN(name, expr)`, `TRY(expr)` (from `macros.hpp`) |
 
-`unwrap*` and `expect*` throw `pjh::result::bad_result_access` on the wrong state.
-
-> **Note:** `T` and `E` must be distinct types, and their move constructors must be
-> `noexcept`. Both are enforced at compile time.
+Accessor methods on the wrong state (`unwrap()` on `Err` or `Moved`, etc.) throw
+`pjh::result::bad_result_access`. Combinators (`map`, `and_then`, etc.) throw
+`pjh::result::bad_result_access` when called on a `Result` in the `Moved` state.
 
 ## Option API at a glance
 
-`pjh::result::Option<T>` mirrors the same design (hand-written storage, `nothrow`-move
-invariant, strong exception guarantee, `T = void` support).
+`pjh::result::Option<T>` mirrors the same design (hand-written union storage,
+`nothrow`-move invariant, strong exception guarantee, `T = void` support).
 
 | Category | Members |
 |---|---|
