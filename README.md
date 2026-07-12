@@ -42,8 +42,7 @@ Add `include/` to your include path — there is nothing to compile.
 ## Quick start
 
 ```cpp
-#include "pjh_result/result.hpp"
-#include "pjh_result/macros.hpp"
+#include "pjh_result.hpp"
 
 namespace res = pjh::result;
 using IntResult = res::Result<int, std::string>;
@@ -113,11 +112,11 @@ Accessor methods on the wrong state (`unwrap()` on `Err` or `Moved`, etc.) throw
 ## Converting between the two
 
 `Option → Result` is a member (`ok_or` / `ok_or_else`). The reverse direction lives in
-`pjh_result/interop.hpp` as free functions (kept out of the class headers to avoid a
+`pjh_result.hpp` as free functions (kept out of the class headers to avoid a
 circular include):
 
 ```cpp
-#include "pjh_result/interop.hpp"
+#include "pjh_result.hpp"
 
 res::Result<int, std::string> r = /* ... */;
 res::Option<int> maybe = res::ok(r);   // Ok -> Some, Err -> None (discards error)

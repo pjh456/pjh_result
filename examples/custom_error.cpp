@@ -2,7 +2,7 @@
 #include <iostream>
 #include <string>
 
-#include "pjh_result/result.hpp"
+#include "pjh_result.hpp"
 
 namespace res = pjh::result;
 
