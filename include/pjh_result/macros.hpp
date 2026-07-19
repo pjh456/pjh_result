@@ -5,8 +5,6 @@
 #ifndef INCLUDE_PJH_RESULT_MACROS_HPP
 #define INCLUDE_PJH_RESULT_MACROS_HPP
 
-#include <utility>
-
 #include "pjh_result/result.hpp"
 
 #define RESULT_CONCAT_INNER(a, b) a##b

@@ -1,7 +1,5 @@
 #include <doctest/doctest.h>
 
-#include <string>
-#include <utility>
 
 #include "pjh_result/option.hpp"
 #include "support/instrumented.hpp"

@@ -1,7 +1,6 @@
 #include <doctest/doctest.h>
 
 #include <string>
-#include <utility>
 
 #include "pjh_result/interop.hpp"
 

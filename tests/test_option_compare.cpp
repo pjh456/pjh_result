@@ -1,6 +1,5 @@
 #include <doctest/doctest.h>
 
-#include <string>
 
 #include "pjh_result/option.hpp"
 
