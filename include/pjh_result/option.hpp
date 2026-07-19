@@ -549,7 +549,7 @@ namespace pjh::result
          * @param msg message carried by the thrown exception
          * @throws bad_result_access when currently None
          */
-        void expect(const std::string &msg) const
+        void expect(const std::string &msg) const &
             requires std::is_void_v<T>
         {
             if (!has_value_)

@@ -541,7 +541,7 @@ namespace pjh::result
          * @param msg message carried by the thrown exception
          * @throws bad_result_access when currently in the Err state
          */
-        void expect(const std::string &msg) const
+        void expect(const std::string &msg) const &
             requires std::is_void_v<T>
         {
             require_not_moved_();
