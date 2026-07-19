@@ -460,7 +460,7 @@ namespace pjh::result
          *
          * @throws bad_result_access when currently in the Err state
          */
-        void unwrap() const
+        void unwrap() const &
             requires std::is_void_v<T>
         {
             require_not_moved_();

@@ -323,7 +323,7 @@ namespace pjh::result
          */
         template <typename U>
             requires(!std::is_void_v<T>) && (!std::is_void_v<U>)
-        [[nodiscard]] Option<std::pair<T, U>> zip(Option<U> other) const
+        [[nodiscard]] Option<std::pair<T, U>> zip(Option<U> other) const &
         {
             if (has_value_ && other.has_value_)
                 return Option<std::pair<T, U>>::Some(std::make_pair(value_, other.value_));
@@ -363,7 +363,7 @@ namespace pjh::result
          */
         template <typename U, typename F>
             requires(!std::is_void_v<T>) && (!std::is_void_v<U>)
-        [[nodiscard]] auto zip_with(Option<U> other, F &&f) const
+        [[nodiscard]] auto zip_with(Option<U> other, F &&f) const &
             -> Option<decltype(std::invoke(f, value_, other.value_))>
         {
             using R = decltype(std::invoke(f, value_, other.value_));
@@ -400,7 +400,7 @@ namespace pjh::result
          * @param other the other Option
          * @return `Option<T>`
          */
-        [[nodiscard]] Option x_or(Option other) const
+        [[nodiscard]] Option x_or(Option other) const &
             requires(!std::is_void_v<T>)
         {
             if (has_value_ != other.has_value_)
@@ -484,7 +484,7 @@ namespace pjh::result
          *
          * @throws bad_result_access when currently None
          */
-        void unwrap() const
+        void unwrap() const &
             requires std::is_void_v<T>
         {
             if (!has_value_)
