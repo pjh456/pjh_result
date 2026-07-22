@@ -147,10 +147,10 @@ namespace pjh::result
         /// @brief Actual storage type of the success branch; degrades to `Unit` when `T = void`.
         using OkT = std::conditional_t<std::is_void_v<T>, Unit, T>;
 
-        static_assert(std::is_nothrow_move_constructible_v<OkT>,
-                      "pjh::result::Result requires T to be nothrow move constructible");
-        static_assert(std::is_nothrow_move_constructible_v<E>,
-                      "pjh::result::Result requires E to be nothrow move constructible");
+        static_assert(std::is_move_constructible_v<OkT>,
+                      "pjh::result::Result requires T to be move constructible");
+        static_assert(std::is_move_constructible_v<E>,
+                      "pjh::result::Result requires E to be move constructible");
 
         detail::Tag tag_;
         union

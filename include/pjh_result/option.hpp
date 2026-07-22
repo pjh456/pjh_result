@@ -45,9 +45,9 @@ namespace pjh::result
      *
      * @tparam T contained value type (may be `void`)
      *
-     * @pre The move constructor of `T` (when non-void) must be `noexcept` (enforced by the
-     *      in-class `static_assert`), so assignment can destroy-then-nothrow-move and never
-     *      leave the object in an invalid state.
+     * @pre The move constructor of `T` (when non-void) must be `noexcept` (enforced by
+     * the in-class `static_assert`), so assignment can destroy-then-nothrow-move and
+     * never leave the object in an invalid state.
      * @note The return value must not be ignored (`[[nodiscard]]`).
      */
     template <typename T>
@@ -57,8 +57,9 @@ namespace pjh::result
         /// @brief Actual storage type; degrades to `Unit` when `T = void`.
         using StoredT = std::conditional_t<std::is_void_v<T>, Unit, T>;
 
-        static_assert(std::is_nothrow_move_constructible_v<StoredT>,
-                      "pjh::result::Option requires T to be nothrow move constructible");
+        static_assert(
+            std::is_move_constructible_v<StoredT>,
+            "pjh::result::Option requires T to be move constructible");
 
         bool has_value_;
         union
@@ -77,15 +78,17 @@ namespace pjh::result
         ///        value-initialized when no argument is given).
         template <typename... A>
             requires std::constructible_from<StoredT, A &&...>
-        explicit Option(some_t, A &&...a) noexcept(std::is_nothrow_constructible_v<StoredT, A &&...>)
-            : has_value_(true), value_(std::forward<A>(a)...)
+        explicit Option(some_t, A &&...a) noexcept(
+            std::is_nothrow_constructible_v<StoredT, A &&...>) :
+            has_value_(true), value_(std::forward<A>(a)...)
         {
         }
 
         /// @brief Constructs the empty (None) state.
         explicit Option(none_t) noexcept : has_value_(false) {}
 
-        /// @brief Destroys the contained value if present; a no-op for trivially destructible types.
+        /// @brief Destroys the contained value if present; a no-op for trivially
+        /// destructible types.
         void destroy_() noexcept
         {
             if (has_value_)
@@ -101,7 +104,8 @@ namespace pjh::result
         {
             has_value_ = o.has_value_;
             if (has_value_)
-                ::new (static_cast<void *>(std::addressof(value_))) StoredT(std::move(o.value_));
+                ::new (static_cast<void *>(std::addressof(value_)))
+                    StoredT(std::move(o.value_));
         }
 
     public:
@@ -114,7 +118,8 @@ namespace pjh::result
          */
         template <typename U>
             requires(!std::is_void_v<T>) && std::constructible_from<StoredT, U &&>
-        static Option Some(U &&val) noexcept(std::is_nothrow_constructible_v<StoredT, U &&>)
+        static Option Some(U &&val) noexcept(
+            std::is_nothrow_constructible_v<StoredT, U &&>)
         {
             return Option(some_t{}, std::forward<U>(val));
         }
@@ -135,10 +140,7 @@ namespace pjh::result
          *
          * @return an `Option` in the None state
          */
-        static Option None() noexcept
-        {
-            return Option(none_t{});
-        }
+        static Option None() noexcept { return Option(none_t{}); }
 
     public:
         /// @brief Copy constructor: copies the contained value if present.
@@ -154,14 +156,16 @@ namespace pjh::result
         Option(Option &&o) noexcept : has_value_(o.has_value_)
         {
             if (has_value_)
-                ::new (static_cast<void *>(std::addressof(value_))) StoredT(std::move(o.value_));
+                ::new (static_cast<void *>(std::addressof(value_)))
+                    StoredT(std::move(o.value_));
         }
 
         /**
          * @brief Copy assignment (strong exception guarantee).
          *
-         * First copy-constructs a temporary (if this step throws, `*this` is left unchanged),
-         * then destroys the old value and nothrow move-constructs from the temporary.
+         * First copy-constructs a temporary (if this step throws, `*this` is left
+         * unchanged), then destroys the old value and nothrow move-constructs from the
+         * temporary.
          */
         Option &operator=(const Option &o)
             requires std::copy_constructible<StoredT>
@@ -256,7 +260,8 @@ namespace pjh::result
          */
         template <typename V = T>
             requires detail::ResultType<V>
-        [[nodiscard]] auto transpose() const & -> Result<Option<detail::result_value_t<V>>, detail::result_error_t<V>>
+        [[nodiscard]] auto transpose() const
+            & -> Result<Option<detail::result_value_t<V>>, detail::result_error_t<V>>
         {
             using InnerV = detail::result_value_t<V>;
             using InnerE = detail::result_error_t<V>;
@@ -283,7 +288,8 @@ namespace pjh::result
         /// @overload
         template <typename V = T>
             requires detail::ResultType<V>
-        [[nodiscard]] auto transpose() && -> Result<Option<detail::result_value_t<V>>, detail::result_error_t<V>>
+        [[nodiscard]] auto transpose()
+            && -> Result<Option<detail::result_value_t<V>>, detail::result_error_t<V>>
         {
             using InnerV = detail::result_value_t<V>;
             using InnerE = detail::result_error_t<V>;
@@ -325,7 +331,8 @@ namespace pjh::result
         [[nodiscard]] Option<std::pair<T, U>> zip(Option<U> other) const &
         {
             if (has_value_ && other.has_value_)
-                return Option<std::pair<T, U>>::Some(std::make_pair(value_, other.value_));
+                return Option<std::pair<T, U>>::Some(
+                    std::make_pair(value_, other.value_));
             return Option<std::pair<T, U>>::None();
         }
 
@@ -362,8 +369,8 @@ namespace pjh::result
          */
         template <typename U, typename F>
             requires(!std::is_void_v<T>) && (!std::is_void_v<U>)
-        [[nodiscard]] auto zip_with(Option<U> other, F &&f) const &
-            -> Option<decltype(std::invoke(f, value_, other.value_))>
+        [[nodiscard]] auto zip_with(Option<U> other, F &&f)
+            const & -> Option<decltype(std::invoke(f, value_, other.value_))>
         {
             using R = decltype(std::invoke(f, value_, other.value_));
             if (has_value_ && other.has_value_)
@@ -374,12 +381,15 @@ namespace pjh::result
         /// @overload
         template <typename U, typename F>
             requires(!std::is_void_v<T>) && (!std::is_void_v<U>)
-        [[nodiscard]] auto zip_with(Option<U> other, F &&f) && -> Option<decltype(std::invoke(f, std::move(value_), std::move(other.value_)))>
+        [[nodiscard]] auto zip_with(Option<U> other, F &&f) && -> Option<
+            decltype(std::invoke(f, std::move(value_), std::move(other.value_)))>
         {
-            using R = decltype(std::invoke(f, std::move(value_), std::move(other.value_)));
+            using R =
+                decltype(std::invoke(f, std::move(value_), std::move(other.value_)));
             if (has_value_ && other.has_value_)
             {
-                auto r = Option<R>::Some(std::invoke(f, std::move(value_), std::move(other.value_)));
+                auto r = Option<R>::Some(
+                    std::invoke(f, std::move(value_), std::move(other.value_)));
                 destroy_();
                 has_value_ = false;
                 return r;
@@ -433,7 +443,8 @@ namespace pjh::result
 
     public:
         /**
-         * @brief Unwraps the contained value; throws if None. Available only when `T` is non-void.
+         * @brief Unwraps the contained value; throws if None. Available only when `T` is
+         * non-void.
          *
          * @throws bad_result_access when currently None
          * @return reference to the contained value
@@ -447,7 +458,8 @@ namespace pjh::result
         }
 
         /**
-         * @brief Unwraps the contained value; throws if None. Available only when `T` is non-void.
+         * @brief Unwraps the contained value; throws if None. Available only when `T` is
+         * non-void.
          *
          * @throws bad_result_access when currently None
          * @return const reference to the contained value
@@ -461,8 +473,8 @@ namespace pjh::result
         }
 
         /**
-         * @brief Unwraps and moves out the contained value; throws if None. Available only when
-         *        `T` is non-void.
+         * @brief Unwraps and moves out the contained value; throws if None. Available
+         * only when `T` is non-void.
          *
          * @throws bad_result_access when currently None
          * @return the moved-out value
@@ -479,7 +491,8 @@ namespace pjh::result
         }
 
         /**
-         * @brief Asserts the option is Some; throws if None. Available only when `T` is `void`.
+         * @brief Asserts the option is Some; throws if None. Available only when `T` is
+         * `void`.
          *
          * @throws bad_result_access when currently None
          */
@@ -648,8 +661,10 @@ namespace pjh::result
          * @return `f(...)` if Some, otherwise @p def
          */
         template <typename F>
-            requires detail::MapCallable<F, T> && (!std::is_void_v<detail::map_result_t<F, T>>)
-        [[nodiscard]] detail::map_result_t<F, T> map_or(detail::map_result_t<F, T> def, F &&f) const
+            requires detail::MapCallable<F, T> &&
+                     (!std::is_void_v<detail::map_result_t<F, T>>)
+        [[nodiscard]] detail::map_result_t<F, T> map_or(
+            detail::map_result_t<F, T> def, F &&f) const
         {
             if (has_value_)
             {
@@ -675,7 +690,9 @@ namespace pjh::result
         template <typename D, typename F>
             requires detail::MapCallable<F, T> && std::invocable<D> &&
                      (!std::is_void_v<detail::map_result_t<F, T>>) &&
-                     std::convertible_to<std::invoke_result_t<D>, detail::map_result_t<F, T>>
+                     std::convertible_to<
+                         std::invoke_result_t<D>,
+                         detail::map_result_t<F, T>>
         [[nodiscard]] detail::map_result_t<F, T> map_or_else(D &&d, F &&f) const
         {
             using U = detail::map_result_t<F, T>;
@@ -697,7 +714,8 @@ namespace pjh::result
          * @tparam F callable observing the value (or nullary when `T = void`)
          * @param f the observer
          * @return const reference to `*this`
-         * @warning Returns a reference to `*this`; do not call on a temporary and keep the result.
+         * @warning Returns a reference to `*this`; do not call on a temporary and keep
+         * the result.
          */
         template <typename F>
             requires detail::MapCallable<F, T>
@@ -717,8 +735,8 @@ namespace pjh::result
         /**
          * @brief Chains an option-returning operation (FlatMap / AndThen).
          *
-         * On Some, invokes `f` (`f()` when `T = void`, otherwise `f(value)`; `f` must return an
-         * `Option`); on None, short-circuits and returns `None`.
+         * On Some, invokes `f` (`f()` when `T = void`, otherwise `f(value)`; `f` must
+         * return an `Option`); on None, short-circuits and returns `None`.
          *
          * @tparam F callable returning an `Option`
          * @param f the follow-up operation
@@ -740,7 +758,8 @@ namespace pjh::result
         }
 
         /**
-         * @brief Chains an option-returning operation (FlatMap / AndThen), rvalue/move overload.
+         * @brief Chains an option-returning operation (FlatMap / AndThen), rvalue/move
+         * overload.
          *
          * @tparam F callable returning an `Option`
          * @param f the follow-up operation
@@ -838,8 +857,7 @@ namespace pjh::result
          * @return `Some(value)` if present and @p pred holds, otherwise `None`
          */
         template <typename F>
-            requires detail::MapCallable<F, T> &&
-                     std::move_constructible<StoredT>
+            requires detail::MapCallable<F, T> && std::move_constructible<StoredT>
         [[nodiscard]] Option filter(F &&pred) &&
         {
             if (has_value_)
@@ -879,8 +897,7 @@ namespace pjh::result
         /// @overload
         template <typename U = T>
             requires detail::OptionType<U>
-        [[nodiscard]] auto flatten()
-            && -> Option<typename U::value_type>
+        [[nodiscard]] auto flatten() && -> Option<typename U::value_type>
         {
             if (!has_value_)
                 return Option<typename U::value_type>::None();
@@ -893,14 +910,16 @@ namespace pjh::result
         /**
          * @brief Moves the value out (if any), leaving `*this` as `None`.
          *
-         * @return the previous state as a new `Option` (Some with the moved value, or None)
+         * @return the previous state as a new `Option` (Some with the moved value, or
+         * None)
          */
         [[nodiscard]] Option take() noexcept
         {
             Option out = Option::None();
             if (has_value_)
             {
-                ::new (static_cast<void *>(std::addressof(out.value_))) StoredT(std::move(value_));
+                ::new (static_cast<void *>(std::addressof(out.value_)))
+                    StoredT(std::move(value_));
                 out.has_value_ = true;
                 destroy_();
                 has_value_ = false;
@@ -925,8 +944,8 @@ namespace pjh::result
         }
 
         /**
-         * @brief Sets the option to `Some(val)` (dropping any previous value) and returns a
-         *        reference to it. Available only when `T` is non-void.
+         * @brief Sets the option to `Some(val)` (dropping any previous value) and returns
+         * a reference to it. Available only when `T` is non-void.
          *
          * @param val the new value
          * @return reference to the stored value
@@ -941,8 +960,8 @@ namespace pjh::result
         }
 
         /**
-         * @brief Returns a reference to the value, inserting @p val first if currently None.
-         *        Available only when `T` is non-void.
+         * @brief Returns a reference to the value, inserting @p val first if currently
+         * None. Available only when `T` is non-void.
          *
          * @param val the value inserted when None
          * @return reference to the stored value
@@ -952,15 +971,16 @@ namespace pjh::result
         {
             if (!has_value_)
             {
-                ::new (static_cast<void *>(std::addressof(value_))) StoredT(std::move(val));
+                ::new (static_cast<void *>(std::addressof(value_)))
+                    StoredT(std::move(val));
                 has_value_ = true;
             }
             return value_;
         }
 
         /**
-         * @brief Returns a reference to the value, default-constructing it first if currently None.
-         *        Available only when `T` is non-void and default-initializable.
+         * @brief Returns a reference to the value, default-constructing it first if
+         * currently None. Available only when `T` is non-void and default-initializable.
          *
          * @return reference to the stored value
          */
@@ -976,8 +996,8 @@ namespace pjh::result
         }
 
         /**
-         * @brief Returns a reference to the value, calling @p f to produce it if currently None.
-         *        Available only when `T` is non-void.
+         * @brief Returns a reference to the value, calling @p f to produce it if
+         * currently None. Available only when `T` is non-void.
          *
          * @tparam F nullary callable returning a value convertible to `StoredT`
          * @param f the fallback producer
@@ -990,7 +1010,8 @@ namespace pjh::result
         {
             if (!has_value_)
             {
-                ::new (static_cast<void *>(std::addressof(value_))) StoredT(static_cast<StoredT>(std::invoke(f)));
+                ::new (static_cast<void *>(std::addressof(value_)))
+                    StoredT(static_cast<StoredT>(std::invoke(f)));
                 has_value_ = true;
             }
             return value_;
@@ -1019,7 +1040,8 @@ namespace pjh::result
         }
 
         /**
-         * @brief Converts to `Result<T, E>`: Some becomes `Ok`, None invokes `f()` to produce `Err`.
+         * @brief Converts to `Result<T, E>`: Some becomes `Ok`, None invokes `f()` to
+         * produce `Err`.
          *
          * @tparam F nullary callable returning `E`
          * @param f the error producer invoked when None
@@ -1069,4 +1091,4 @@ namespace pjh::result
     };
 }
 
-#endif // INCLUDE_PJH_RESULT_OPTION_HPP
+#endif  // INCLUDE_PJH_RESULT_OPTION_HPP
