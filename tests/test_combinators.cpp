@@ -285,6 +285,27 @@ static_assert(std::is_same_v<
               decltype(std::declval<StrResult &>().inspect_err(&observe_err)),
               const StrResult &>);
 
+namespace
+{
+    // Task 37: `inspect`/`inspect_err` return references, so a const rvalue call is
+    // deleted; const lvalues and non-const rvalues stay valid.
+    template <typename X, typename F>
+    concept ConstRvalueInspect = requires { std::declval<const X &&>().inspect(std::declval<F>()); };
+    template <typename X, typename F>
+    concept ConstRvalueInspectErr =
+        requires { std::declval<const X &&>().inspect_err(std::declval<F>()); };
+    template <typename X, typename F>
+    concept ConstLvalueInspect = requires { std::declval<const X &>().inspect(std::declval<F>()); };
+}
+
+static_assert(!ConstRvalueInspect<StrResult, void (*)(int)>);
+static_assert(!ConstRvalueInspectErr<StrResult, void (*)(const std::string &)>);
+static_assert(ConstLvalueInspect<StrResult, void (*)(int)>);
+static_assert(requires { std::declval<StrResult &&>().inspect(std::declval<void (*)(int)>()); });
+static_assert(requires {
+    std::declval<StrResult &&>().inspect_err(std::declval<void (*)(const std::string &)>());
+});
+
 TEST_CASE("map transforms the Ok value")
 {
     auto r = res::Result<int, std::string>::Ok(10).map(

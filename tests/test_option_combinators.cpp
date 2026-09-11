@@ -125,6 +125,20 @@ static_assert(std::is_same_v<
               decltype(std::declval<IntOpt &>().inspect(&observe_int)),
               const IntOpt &>);
 
+namespace
+{
+    // Task 37: `inspect` returns a reference, so a const rvalue call is deleted;
+    // const lvalues and non-const rvalues stay valid.
+    template <typename X, typename F>
+    concept ConstRvalueInspect = requires { std::declval<const X &&>().inspect(std::declval<F>()); };
+    template <typename X, typename F>
+    concept ConstLvalueInspect = requires { std::declval<const X &>().inspect(std::declval<F>()); };
+}
+
+static_assert(!ConstRvalueInspect<IntOpt, void (*)(int)>);
+static_assert(ConstLvalueInspect<IntOpt, void (*)(int)>);
+static_assert(requires { std::declval<IntOpt &&>().inspect(std::declval<void (*)(int)>()); });
+
 TEST_CASE("map transforms Some, passes None through")
 {
     auto s = res::Option<int>::Some(10).map(

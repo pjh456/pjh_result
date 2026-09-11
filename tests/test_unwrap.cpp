@@ -157,3 +157,38 @@ TEST_CASE("unwrap_or family throws on moved Result")
     CHECK_THROWS_AS((void)r.unwrap_or_default(), bad_access);
     CHECK_THROWS_AS((void)r.unwrap_err_or(std::string("d")), bad_access);
 }
+
+namespace
+{
+    // Task 37: the reference-returning `const&` accessors must reject const rvalues
+    // (deleted `const&&` overloads) so a temporary cannot leave a dangling reference,
+    // while const lvalues and non-const rvalues remain valid.
+    using IntStrResult = res::Result<int, std::string>;
+
+    template <typename X>
+    concept ConstRvalueUnwrap = requires { std::declval<const X &&>().unwrap(); };
+    template <typename X>
+    concept ConstRvalueExpect = requires { std::declval<const X &&>().expect("m"); };
+    template <typename X>
+    concept ConstRvalueUnwrapErr = requires { std::declval<const X &&>().unwrap_err(); };
+    template <typename X>
+    concept ConstRvalueExpectErr = requires { std::declval<const X &&>().expect_err("m"); };
+    template <typename X>
+    concept ConstLvalueUnwrap = requires { std::declval<const X &>().unwrap(); };
+    template <typename X>
+    concept RvalueUnwrap = requires { std::declval<X &&>().unwrap(); };
+}
+
+static_assert(!ConstRvalueUnwrap<IntStrResult>);
+static_assert(!ConstRvalueExpect<IntStrResult>);
+static_assert(!ConstRvalueUnwrapErr<IntStrResult>);
+static_assert(!ConstRvalueExpectErr<IntStrResult>);
+static_assert(ConstLvalueUnwrap<IntStrResult>);
+static_assert(RvalueUnwrap<IntStrResult>);
+static_assert(requires { std::declval<IntStrResult &&>().expect("m"); });
+static_assert(requires { std::declval<const IntStrResult &>().unwrap_err(); });
+static_assert(requires { std::declval<IntStrResult &&>().unwrap_err(); });
+static_assert(requires { std::declval<const IntStrResult &>().expect_err("m"); });
+static_assert(requires { std::declval<IntStrResult &&>().expect_err("m"); });
+// void results keep their non-const rvalue entry points.
+static_assert(requires { std::declval<res::Result<void, std::string> &&>().unwrap(); });

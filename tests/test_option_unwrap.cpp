@@ -78,3 +78,29 @@ TEST_CASE("unwrap_or_default returns default-constructed T on None")
     CHECK(res::Option<int>::None().unwrap_or_default() == 0);
     CHECK(res::Option<int>::Some(9).unwrap_or_default() == 9);
 }
+
+namespace
+{
+    // Task 37: the reference-returning `const&` accessors must reject const rvalues
+    // (deleted `const&&` overloads) so a temporary cannot leave a dangling reference,
+    // while const lvalues and non-const rvalues remain valid.
+    template <typename X>
+    concept ConstRvalueUnwrap = requires { std::declval<const X &&>().unwrap(); };
+    template <typename X>
+    concept ConstRvalueExpect = requires { std::declval<const X &&>().expect("m"); };
+    template <typename X>
+    concept ConstLvalueUnwrap = requires { std::declval<const X &>().unwrap(); };
+    template <typename X>
+    concept RvalueUnwrap = requires { std::declval<X &&>().unwrap(); };
+}
+
+using IntOpt = res::Option<int>;
+
+static_assert(!ConstRvalueUnwrap<IntOpt>);
+static_assert(!ConstRvalueExpect<IntOpt>);
+static_assert(ConstLvalueUnwrap<IntOpt>);
+static_assert(RvalueUnwrap<IntOpt>);
+static_assert(requires { std::declval<IntOpt &&>().expect("m"); });
+static_assert(requires { std::declval<const IntOpt &>().expect("m"); });
+// void options keep their non-const rvalue entry points.
+static_assert(requires { std::declval<res::Option<void> &&>().unwrap(); });

@@ -681,6 +681,10 @@ namespace pjh::result
             return value_;
         }
 
+        /// @brief Deleted: a `const` rvalue would leave a dangling reference.
+        [[nodiscard]] const StoredT &unwrap() const &&
+            requires(!std::is_void_v<T>) = delete;
+
         /**
          * @brief Unwraps and moves out the contained value; throws if None. Available
          * only when `T` is non-void.
@@ -743,6 +747,10 @@ namespace pjh::result
                 throw bad_result_access(msg);
             return value_;
         }
+
+        /// @brief Deleted: a `const` rvalue would leave a dangling reference.
+        [[nodiscard]] const StoredT &expect(const std::string &msg) const &&
+            requires(!std::is_void_v<T>) = delete;
 
         /**
          * @brief Unwraps and moves out the value, throwing @p msg if None.
@@ -939,6 +947,11 @@ namespace pjh::result
             }
             return *this;
         }
+
+        /// @brief Deleted: a `const` rvalue would leave a dangling reference.
+        template <typename F>
+            requires detail::MapCallable<F, T>
+        const Option &inspect(F &&f) const && = delete;
 
         /**
          * @brief Invokes @p f on the value if Some, then returns `*this` by value.

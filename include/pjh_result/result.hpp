@@ -721,6 +721,10 @@ namespace pjh::result
             return ok_;
         }
 
+        /// @brief Deleted: a `const` rvalue would leave a dangling reference.
+        [[nodiscard]] const OkT &unwrap() const &&
+            requires(!std::is_void_v<T>) = delete;
+
         /**
          * @brief Unwraps and moves out the success value; throws if Err. Available only when
          *        `T` is non-void.
@@ -800,6 +804,10 @@ namespace pjh::result
                 throw bad_result_access(msg);
             return ok_;
         }
+
+        /// @brief Deleted: a `const` rvalue would leave a dangling reference.
+        [[nodiscard]] const OkT &expect(const std::string &msg) const &&
+            requires(!std::is_void_v<T>) = delete;
 
         /**
          * @brief Unwraps and moves out the success value, throwing @p msg if Err.
@@ -898,6 +906,9 @@ namespace pjh::result
             return err_;
         }
 
+        /// @brief Deleted: a `const` rvalue would leave a dangling reference.
+        [[nodiscard]] const E &unwrap_err() const && = delete;
+
         /**
          * @brief Unwraps and moves out the error value; throws if Ok.
          *
@@ -991,6 +1002,9 @@ namespace pjh::result
                 throw bad_result_access(msg);
             return err_;
         }
+
+        /// @brief Deleted: a `const` rvalue would leave a dangling reference.
+        [[nodiscard]] const E &expect_err(const std::string &msg) const && = delete;
 
         /**
          * @brief Unwraps and moves out the error value, throwing @p msg if Ok.
@@ -1168,6 +1182,11 @@ namespace pjh::result
             return *this;
         }
 
+        /// @brief Deleted: a `const` rvalue would leave a dangling reference.
+        template <typename F>
+            requires detail::MapCallable<F, T>
+        const Result &inspect(F &&f) const && = delete;
+
         /**
          * @brief Invokes @p f on the success value if Ok, then returns `*this` by value.
          *
@@ -1213,6 +1232,11 @@ namespace pjh::result
                 std::invoke(f, err_);
             return *this;
         }
+
+        /// @brief Deleted: a `const` rvalue would leave a dangling reference.
+        template <typename F>
+            requires std::invocable<F, const E &>
+        const Result &inspect_err(F &&f) const && = delete;
 
         /**
          * @brief Invokes @p f on the error value if Err, then returns `*this` by value.
