@@ -469,11 +469,13 @@ namespace pjh::result
          * @tparam F predicate on the success value (or nullary when `T = void`)
          * @param f the predicate
          * @return `is_ok() && bool(f(...))`
+         * @throws bad_result_access when the result is in the Moved state
          */
         template <typename F>
             requires detail::MapCallable<F, T>
         [[nodiscard]] bool is_ok_and(F &&f) const
         {
+            require_not_moved_();
             if (!is_ok())
                 return false;
             if constexpr (std::is_void_v<T>)
@@ -488,11 +490,13 @@ namespace pjh::result
          * @tparam F predicate on the error value
          * @param f the predicate
          * @return `is_err() && bool(f(error))`
+         * @throws bad_result_access when the result is in the Moved state
          */
         template <typename F>
             requires std::invocable<F, E>
         [[nodiscard]] bool is_err_and(F &&f) const
         {
+            require_not_moved_();
             return is_err() && static_cast<bool>(std::invoke(f, err_));
         }
 
@@ -501,10 +505,12 @@ namespace pjh::result
          *
          * @param val the value to compare against
          * @return `is_ok() && ok_ == val`
+         * @throws bad_result_access when the result is in the Moved state
          */
         [[nodiscard]] bool contains(const OkT &val) const
             requires(!std::is_void_v<T>) && std::equality_comparable<OkT>
         {
+            require_not_moved_();
             return is_ok() && ok_ == val;
         }
 
@@ -513,10 +519,12 @@ namespace pjh::result
          *
          * @param val the error to compare against
          * @return `is_err() && err_ == val`
+         * @throws bad_result_access when the result is in the Moved state
          */
         [[nodiscard]] bool contains_err(const E &val) const
             requires std::equality_comparable<E>
         {
+            require_not_moved_();
             return is_err() && err_ == val;
         }
 
@@ -687,10 +695,12 @@ namespace pjh::result
          *
          * @param val the default returned when in the Err state
          * @return the success value, or @p val
+         * @throws bad_result_access when the result is in the Moved state
          */
         [[nodiscard]] OkT unwrap_or(OkT val) const
             requires(!std::is_void_v<T>)
         {
+            require_not_moved_();
             return is_ok() ? ok_ : std::move(val);
         }
 
@@ -786,10 +796,12 @@ namespace pjh::result
          *        Available only when `T` is non-void and default-initializable.
          *
          * @return the success value, or `T{}`
+         * @throws bad_result_access when the result is in the Moved state
          */
         [[nodiscard]] T unwrap_or_default() const
             requires(!std::is_void_v<T>) && std::default_initializable<T>
         {
+            require_not_moved_();
             if (is_ok())
                 return ok_;
             return T{};
@@ -844,9 +856,11 @@ namespace pjh::result
          *
          * @param err the default returned when in the Ok state
          * @return the error value, or @p err
+         * @throws bad_result_access when the result is in the Moved state
          */
         [[nodiscard]] E unwrap_err_or(E err) const
         {
+            require_not_moved_();
             return is_err() ? err_ : std::move(err);
         }
 
@@ -1015,11 +1029,13 @@ namespace pjh::result
          * @param def value returned when in the Err state
          * @param f transform applied to the success value
          * @return `f(...)` if Ok, otherwise @p def
+         * @throws bad_result_access when the result is in the Moved state
          */
         template <typename F>
             requires detail::MapCallable<F, T> && (!std::is_void_v<detail::map_result_t<F, T>>)
         [[nodiscard]] detail::map_result_t<F, T> map_or(detail::map_result_t<F, T> def, F &&f) const
         {
+            require_not_moved_();
             if (is_ok())
             {
                 if constexpr (std::is_void_v<T>)
@@ -1067,12 +1083,14 @@ namespace pjh::result
          * @tparam F callable observing the success value (or nullary when `T = void`)
          * @param f the observer
          * @return const reference to `*this`
+         * @throws bad_result_access when the result is in the Moved state
          * @warning Returns a reference to `*this`; do not call on a temporary and keep the result.
          */
         template <typename F>
             requires detail::MapCallable<F, T>
         const Result &inspect(F &&f) const &
         {
+            require_not_moved_();
             if (is_ok())
             {
                 if constexpr (std::is_void_v<T>)
@@ -1093,11 +1111,13 @@ namespace pjh::result
          * @tparam F callable observing the success value (or nullary when `T = void`)
          * @param f the observer
          * @return `*this` moved into a new `Result`
+         * @throws bad_result_access when the result is in the Moved state
          */
         template <typename F>
             requires detail::MapCallable<F, T>
         [[nodiscard]] Result inspect(F &&f) &&
         {
+            require_not_moved_();
             if (is_ok())
             {
                 if constexpr (std::is_void_v<T>)
@@ -1114,12 +1134,14 @@ namespace pjh::result
          * @tparam F callable observing the error value
          * @param f the observer
          * @return const reference to `*this`
+         * @throws bad_result_access when the result is in the Moved state
          * @warning Returns a reference to `*this`; do not call on a temporary and keep the result.
          */
         template <typename F>
             requires std::invocable<F, const E &>
         const Result &inspect_err(F &&f) const &
         {
+            require_not_moved_();
             if (is_err())
                 std::invoke(f, err_);
             return *this;
@@ -1135,11 +1157,13 @@ namespace pjh::result
          * @tparam F callable observing the error value
          * @param f the observer
          * @return `*this` moved into a new `Result`
+         * @throws bad_result_access when the result is in the Moved state
          */
         template <typename F>
             requires std::invocable<F, const E &>
         [[nodiscard]] Result inspect_err(F &&f) &&
         {
+            require_not_moved_();
             if (is_err())
                 std::invoke(f, err_);
             return std::move(*this);

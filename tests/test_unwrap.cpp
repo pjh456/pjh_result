@@ -147,3 +147,13 @@ TEST_CASE("unwrap_or_default returns default-constructed T on Err")
     auto ok = res::Result<int, std::string>::Ok(9);
     CHECK(ok.unwrap_or_default() == 9);
 }
+
+TEST_CASE("unwrap_or family throws on moved Result")
+{
+    auto r = res::Result<int, std::string>::Ok(5);
+    (void)std::move(r).unwrap();
+
+    CHECK_THROWS_AS((void)r.unwrap_or(0), bad_access);
+    CHECK_THROWS_AS((void)r.unwrap_or_default(), bad_access);
+    CHECK_THROWS_AS((void)r.unwrap_err_or(std::string("d")), bad_access);
+}

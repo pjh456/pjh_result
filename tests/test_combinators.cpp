@@ -300,6 +300,27 @@ TEST_CASE("map_or_else throws on moved Result")
         bad_access);
 }
 
+TEST_CASE("map_or throws on moved Result")
+{
+    auto r = StrResult::Ok(5);
+    (void)std::move(r).unwrap();
+    CHECK_THROWS_AS(
+        (void)r.map_or(-1, [](int v)
+                       { return v * 2; }),
+        bad_access);
+}
+
+TEST_CASE("inspect and inspect_err throw on moved Result")
+{
+    auto r = StrResult::Ok(5);
+    (void)std::move(r).unwrap();
+
+    CHECK_THROWS_AS((void)r.inspect(&observe_ok), bad_access);
+    CHECK_THROWS_AS((void)std::move(r).inspect(&observe_ok), bad_access);
+    CHECK_THROWS_AS((void)r.inspect_err(&observe_err), bad_access);
+    CHECK_THROWS_AS((void)std::move(r).inspect_err(&observe_err), bad_access);
+}
+
 TEST_CASE("and_then throws on moved Result")
 {
     auto r = res::Result<int, std::string>::Ok(5);

@@ -1,10 +1,12 @@
 #include <doctest/doctest.h>
 
 #include <string>
+#include <utility>
 
 #include "pjh_result/result.hpp"
 
 namespace res = pjh::result;
+using bad_access = pjh::result::bad_result_access;
 
 TEST_CASE("is_ok_and checks the success value")
 {
@@ -67,4 +69,42 @@ TEST_CASE("contains_err matches Err value")
 
     auto ok = res::Result<int, std::string>::Ok(1);
     CHECK_FALSE(ok.contains_err(std::string("x")));
+}
+
+TEST_CASE("queries throw on moved Result")
+{
+    auto r = res::Result<int, std::string>::Ok(42);
+    (void)std::move(r).unwrap();
+
+    CHECK_THROWS_AS(
+        (void)r.is_ok_and(
+            [](int)
+            { return true; }),
+        bad_access);
+    CHECK_THROWS_AS(
+        (void)r.is_err_and(
+            [](const std::string &)
+            { return true; }),
+        bad_access);
+    CHECK_THROWS_AS((void)r.contains(42), bad_access);
+    CHECK_THROWS_AS((void)r.contains_err(std::string("x")), bad_access);
+}
+
+TEST_CASE("queries throw on a Result moved from the Err state")
+{
+    auto r = res::Result<int, std::string>::Err(std::string("e"));
+    (void)std::move(r).unwrap_err();
+
+    CHECK_THROWS_AS(
+        (void)r.is_ok_and(
+            [](int)
+            { return true; }),
+        bad_access);
+    CHECK_THROWS_AS(
+        (void)r.is_err_and(
+            [](const std::string &)
+            { return true; }),
+        bad_access);
+    CHECK_THROWS_AS((void)r.contains(0), bad_access);
+    CHECK_THROWS_AS((void)r.contains_err(std::string("e")), bad_access);
 }
