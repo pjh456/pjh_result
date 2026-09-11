@@ -6,8 +6,8 @@
  * These live outside both class headers to avoid a circular include: `option.hpp`
  * already depends on `result.hpp` (for `ok_or`), so the `Result` -> `Option` direction
  * is declared in `result.hpp` (which forward-declares `Option`) and defined here, where
- * both types are complete. The free functions `ok()` / `err()` provide the historical
- * call syntax alongside the members.
+ * both types are complete. The free functions `ok()` / `err()` are thin wrappers that
+ * delegate to the members.
  */
 #ifndef INCLUDE_PJH_RESULT_INTEROP_HPP
 #define INCLUDE_PJH_RESULT_INTEROP_HPP
@@ -107,14 +107,7 @@ namespace pjh::result
     template <typename T, typename E>
     [[nodiscard]] Option<T> ok(const Result<T, E> &r)
     {
-        if (r.is_ok())
-        {
-            if constexpr (std::is_void_v<T>)
-                return Option<void>::Some();
-            else
-                return Option<T>::Some(r.unwrap());
-        }
-        return Option<T>::None();
+        return r.ok();
     }
 
     /**
@@ -128,14 +121,7 @@ namespace pjh::result
     template <typename T, typename E>
     [[nodiscard]] Option<T> ok(Result<T, E> &&r)
     {
-        if (r.is_ok())
-        {
-            if constexpr (std::is_void_v<T>)
-                return Option<void>::Some();
-            else
-                return Option<T>::Some(std::move(r).unwrap());
-        }
-        return Option<T>::None();
+        return std::move(r).ok();
     }
 
     /**
@@ -151,9 +137,7 @@ namespace pjh::result
     template <typename T, typename E>
     [[nodiscard]] Option<E> err(const Result<T, E> &r)
     {
-        if (r.is_err())
-            return Option<E>::Some(r.unwrap_err());
-        return Option<E>::None();
+        return r.err();
     }
 
     /**
@@ -167,9 +151,7 @@ namespace pjh::result
     template <typename T, typename E>
     [[nodiscard]] Option<E> err(Result<T, E> &&r)
     {
-        if (r.is_err())
-            return Option<E>::Some(std::move(r).unwrap_err());
-        return Option<E>::None();
+        return std::move(r).err();
     }
 }
 
