@@ -54,6 +54,18 @@ namespace
     {
         long operator()(const std::string &) const;
     };
+
+    // Task 21: returns a Result and is invocable only with an rvalue `int&&`. The
+    // const& overload of and_then must reject it cleanly (SFINAE via the
+    // cref_result_t fallback) instead of hard-erroring, while the && overload
+    // (value_result_t) accepts it and forwards a moved `int`.
+    struct RvalueOnlyResultFn
+    {
+        res::Result<long, std::string> operator()(int &&v) const
+        {
+            return res::Result<long, std::string>::Ok(static_cast<long>(v));
+        }
+    };
 }
 
 /// Whether the const-member combinators accept the callable `F` on `R`'s value.
@@ -64,11 +76,31 @@ concept MapCompat = requires(const R &r, F f) {
     r.is_ok_and(f);
 };
 
+/// Whether `and_then` on a const lvalue accepts `F` (the `CrefResultFn` path).
+template <typename R, typename F>
+concept ConstAndThenCompat = requires(const R &r, F f) {
+    { r.and_then(f) };
+};
+
+/// Whether `and_then` on an rvalue accepts `F` (the `ValueResultFn` path).
+template <typename R, typename F>
+concept RvalueAndThenCompat = requires(R &&r, F f) {
+    { std::move(r).and_then(f) };
+};
+
 // 编译期：MapCallable 以 `const T&` 判定，rvalue-only 可调用对象应被拒绝
 static_assert(!res::detail::MapCallable<RvalueOnly, int>);
 static_assert(res::detail::MapCallable<ConstRefOnly, int>);
 static_assert(!MapCompat<StrResult, RvalueOnly>);
 static_assert(MapCompat<StrResult, ConstRefOnly>);
+
+// 编译期：rvalue-only 且返回 Result 的可调用对象被 const& 版 and_then 干净拒绝
+// （SFINAE 而非硬错），&& 版接受；cref_result_t 在不可调用时退化为 void。
+static_assert(std::is_same_v<res::detail::cref_result_t<RvalueOnlyResultFn, int>, void>);
+// value_result_t 对“无法以 T 调用”的 F 同样退化为 void（&& 版的防御性回退）。
+static_assert(std::is_same_v<res::detail::value_result_t<ErrorToLong, int>, void>);
+static_assert(!ConstAndThenCompat<StrResult, RvalueOnlyResultFn>);
+static_assert(RvalueAndThenCompat<StrResult, RvalueOnlyResultFn>);
 
 // 编译期：map_result_t 以 `const T&` 推导返回类型，与 const 成员的实际调用形式一致
 static_assert(std::is_same_v<res::detail::map_result_t<OverloadedMap, int>, long>);
@@ -165,6 +197,14 @@ TEST_CASE("and_then short-circuits on Err")
                                                                            { return res::Result<int, std::string>::Ok(x + 100); });
     CHECK(r.is_err());
     CHECK(r.unwrap_err() == "e");
+}
+
+TEST_CASE("and_then rvalue overload accepts an rvalue-only callable")
+{
+    auto r = StrResult::Ok(3);
+    auto out = std::move(r).and_then(RvalueOnlyResultFn{});
+    CHECK(out.is_ok());
+    CHECK(out.unwrap() == 3L);
 }
 
 TEST_CASE("or_else recovers from Err")

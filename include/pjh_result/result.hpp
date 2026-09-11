@@ -62,10 +62,19 @@ namespace pjh::result
         using map_result_t = typename map_result<F, T>::type;
 
         /// @brief Result type of `and_then(const &)`: `f()` when `T = void`, otherwise `f(const T&)`.
+        ///        When `F` is not invocable with `const T&` the trait degrades to `void` instead
+        ///        of hard-erroring, so the alias stays usable in return types while the
+        ///        `CrefResultFn` constraint rejects `F`.
         template <typename F, typename T, bool = std::is_void_v<T>>
         struct cref_result
         {
             using type = std::invoke_result_t<F, const T &>;
+        };
+        template <typename F, typename T>
+            requires(!std::invocable<F, const T &>)
+        struct cref_result<F, T, false>
+        {
+            using type = void;
         };
         template <typename F, typename T>
         struct cref_result<F, T, true>
@@ -76,10 +85,19 @@ namespace pjh::result
         using cref_result_t = typename cref_result<F, T>::type;
 
         /// @brief Result type of `and_then(&&)`: `f()` when `T = void`, otherwise `f(T)`.
+        ///        When `F` is not invocable with `T` the trait degrades to `void` instead of
+        ///        hard-erroring, so the alias stays usable in return types while the
+        ///        `ValueResultFn` constraint rejects `F`.
         template <typename F, typename T, bool = std::is_void_v<T>>
         struct value_result
         {
             using type = std::invoke_result_t<F, T>;
+        };
+        template <typename F, typename T>
+            requires(!std::invocable<F, T>)
+        struct value_result<F, T, false>
+        {
+            using type = void;
         };
         template <typename F, typename T>
         struct value_result<F, T, true>
