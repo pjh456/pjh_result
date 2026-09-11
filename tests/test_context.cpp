@@ -75,6 +75,10 @@ namespace
 
     template <typename C>
     concept ConstRvalueMessages = requires(const C &t) { std::move(t).messages(); };
+
+    // requires-expression 内的 sizeof 强制实例化，未满足的类级约束在此为替换失败
+    template <typename E>
+    concept ContextInstantiable = requires { sizeof(res::Context<E>); };
 }
 
 // 编译期：引用返回访问器的 const 右值形态被 delete 拒绝，避免临时量悬垂
@@ -86,6 +90,12 @@ static_assert(requires(const res::Context<Err> &c) {
     c.root_cause();
     c.messages();
 });
+
+// 编译期：类级约束拒绝 void / 引用错误类型，合法 E 不受影响
+static_assert(ContextInstantiable<Err>);
+static_assert(ContextInstantiable<std::string>);
+static_assert(!ContextInstantiable<void>);
+static_assert(!ContextInstantiable<int &>);
 
 TEST_CASE("context on Ok passes the value through without constructing a context")
 {

@@ -19,9 +19,12 @@
 #include <utility>
 #include <vector>
 
+#include "pjh_result/detail/traits.hpp"
+
 namespace pjh::result
 {
     template <typename E>
+        requires detail::ValidErrorType<E>
     class Context;
 }
 
@@ -78,9 +81,10 @@ namespace pjh::result
      * // rendered: "load deck: parse json: <root>"
      * @endcode
      *
-     * @tparam E the root error type
+     * @tparam E the root error type; must be storable and non-void
      */
     template <typename E>
+        requires detail::ValidErrorType<E>
     class [[nodiscard]] Context
     {
     public:
