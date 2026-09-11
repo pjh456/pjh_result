@@ -12,6 +12,7 @@
 #include <type_traits>
 #include <utility>
 
+#include "pjh_result/context.hpp"
 #include "pjh_result/detail/traits.hpp"
 #include "pjh_result/errors.hpp"
 
@@ -849,6 +850,116 @@ namespace pjh::result
             if (is_err())
                 std::invoke(f, err_);
             return *this;
+        }
+
+        /**
+         * @brief Attaches an error context message (const overload).
+         *
+         * On Ok, returns the success value unchanged without constructing any context
+         * (zero-cost). On Err(e), returns `Err(Context<E>(e).context(msg))`, or appends
+         * @p msg to the existing chain when `E` is already a `Context`.
+         *
+         * @tparam M message type constructible into `std::string`
+         * @param msg description of what was being done
+         * @return `Result<T, Context<E>>` (or `Result<T, E>` when `E` is a `Context`)
+         */
+        template <typename M>
+            requires std::copy_constructible<E> &&
+                     std::constructible_from<std::string, M &&>
+        [[nodiscard]] auto context(M &&msg) const &
+            -> Result<T, detail::context_error_t<E>>
+        {
+            require_not_moved_();
+            using E2 = detail::context_error_t<E>;
+
+            if (is_err())
+            {
+                if constexpr (detail::is_context_v<E>)
+                    return Result<T, E2>::Err(err_.context(std::forward<M>(msg)));
+                else
+                    return Result<T, E2>::Err(Context<E>(err_).context(std::forward<M>(msg)));
+            }
+            if constexpr (std::is_void_v<T>)
+                return Result<T, E2>::Ok();
+            else
+                return Result<T, E2>::Ok(ok_);
+        }
+
+        /// @overload (rvalue: moves the error instead of copying it)
+        template <typename M>
+            requires std::constructible_from<std::string, M &&>
+        [[nodiscard]] auto context(M &&msg) &&
+            -> Result<T, detail::context_error_t<E>>
+        {
+            require_not_moved_();
+            using E2 = detail::context_error_t<E>;
+
+            if (is_err())
+            {
+                if constexpr (detail::is_context_v<E>)
+                    return Result<T, E2>::Err(std::move(err_).context(std::forward<M>(msg)));
+                else
+                    return Result<T, E2>::Err(Context<E>(std::move(err_)).context(std::forward<M>(msg)));
+            }
+            if constexpr (std::is_void_v<T>)
+                return Result<T, E2>::Ok();
+            else
+                return Result<T, E2>::Ok(std::move(ok_));
+        }
+
+        /**
+         * @brief Attaches a lazily-produced error context message (const overload).
+         *
+         * @p f is invoked at most once and only in the Err state, so no message is
+         * produced for a successful result.
+         *
+         * @tparam F nullary callable returning a message constructible into `std::string`
+         * @param f context producer, invoked only on Err
+         * @return `Result<T, Context<E>>` (or `Result<T, E>` when `E` is a `Context`)
+         */
+        template <typename F>
+            requires std::copy_constructible<E> && std::invocable<F> &&
+                     std::constructible_from<std::string, std::invoke_result_t<F>>
+        [[nodiscard]] auto with_context(F &&f) const &
+            -> Result<T, detail::context_error_t<E>>
+        {
+            require_not_moved_();
+            using E2 = detail::context_error_t<E>;
+
+            if (is_err())
+            {
+                if constexpr (detail::is_context_v<E>)
+                    return Result<T, E2>::Err(err_.context(std::invoke(std::forward<F>(f))));
+                else
+                    return Result<T, E2>::Err(Context<E>(err_).context(std::invoke(std::forward<F>(f))));
+            }
+            if constexpr (std::is_void_v<T>)
+                return Result<T, E2>::Ok();
+            else
+                return Result<T, E2>::Ok(ok_);
+        }
+
+        /// @overload (rvalue: moves the error instead of copying it)
+        template <typename F>
+            requires std::invocable<F> &&
+                     std::constructible_from<std::string, std::invoke_result_t<F>>
+        [[nodiscard]] auto with_context(F &&f) &&
+            -> Result<T, detail::context_error_t<E>>
+        {
+            require_not_moved_();
+            using E2 = detail::context_error_t<E>;
+
+            if (is_err())
+            {
+                if constexpr (detail::is_context_v<E>)
+                    return Result<T, E2>::Err(std::move(err_).context(std::invoke(std::forward<F>(f))));
+                else
+                    return Result<T, E2>::Err(Context<E>(std::move(err_)).context(std::invoke(std::forward<F>(f))));
+            }
+            if constexpr (std::is_void_v<T>)
+                return Result<T, E2>::Ok();
+            else
+                return Result<T, E2>::Ok(std::move(ok_));
         }
 
     public:

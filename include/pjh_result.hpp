@@ -2,6 +2,7 @@
 #define INCLUDE_PJH_RESULT_HPP
 
 #include "pjh_result/errors.hpp"
+#include "pjh_result/context.hpp"
 #include "pjh_result/result.hpp"
 #include "pjh_result/option.hpp"
 #include "pjh_result/interop.hpp"
