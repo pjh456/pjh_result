@@ -58,6 +58,10 @@ namespace
     }
 }
 
+// 编译期：messages() 的右值重载只移动 vector，必须与 const& 重载一样标为 noexcept
+static_assert(noexcept(std::declval<res::Context<Err> &&>().messages()));
+static_assert(noexcept(std::declval<const res::Context<Err> &>().messages()));
+
 TEST_CASE("context on Ok passes the value through without constructing a context")
 {
     auto r = res::Result<int, Err>::Ok(42);

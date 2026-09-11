@@ -165,7 +165,7 @@ namespace pjh::result
         /// @brief The full context chain, ordered outermost-first.
         [[nodiscard]] const std::vector<std::string> &messages() const & noexcept { return chain_; }
         /// @brief The full context chain (moved out), ordered outermost-first.
-        [[nodiscard]] std::vector<std::string> messages() && { return std::move(chain_); }
+        [[nodiscard]] std::vector<std::string> messages() && noexcept { return std::move(chain_); }
 
         /**
          * @brief Outermost context message as a view (empty when no layer was attached).
