@@ -2,6 +2,7 @@
 
 #include <utility>
 
+#include "pjh_result/option.hpp"
 #include "pjh_result/result.hpp"
 #include "support/instrumented.hpp"
 
@@ -93,6 +94,82 @@ TEST_CASE("no leak through rvalue unwrap_err")
         auto r = res::Result<int, InstanceCounter>::Err(InstanceCounter{11});
         InstanceCounter e = std::move(r).unwrap_err();
         CHECK(e.id == 11);
+    }
+    CHECK(InstanceCounter::live == 0);
+}
+
+TEST_CASE("no leak through rvalue flatten of a nested Ok")
+{
+    InstanceCounter::reset();
+    {
+        auto outer = res::Result<res::Result<InstanceCounter, int>, int>::Ok(
+            res::Result<InstanceCounter, int>::Ok(InstanceCounter{22}));
+        auto flat = std::move(outer).flatten();
+        CHECK(flat.unwrap().id == 22);
+    }
+    CHECK(InstanceCounter::live == 0);
+}
+
+TEST_CASE("no leak through rvalue flatten of a nested Err")
+{
+    InstanceCounter::reset();
+    {
+        auto outer =
+            res::Result<res::Result<int, InstanceCounter>, InstanceCounter>::Ok(
+                res::Result<int, InstanceCounter>::Err(InstanceCounter{21}));
+        auto flat = std::move(outer).flatten();
+        CHECK(flat.unwrap_err().id == 21);
+    }
+    CHECK(InstanceCounter::live == 0);
+}
+
+TEST_CASE("no leak through rvalue flatten of an outer Err")
+{
+    InstanceCounter::reset();
+    {
+        auto outer =
+            res::Result<res::Result<int, InstanceCounter>, InstanceCounter>::Err(
+                InstanceCounter{23});
+        auto flat = std::move(outer).flatten();
+        CHECK(flat.unwrap_err().id == 23);
+    }
+    CHECK(InstanceCounter::live == 0);
+}
+
+TEST_CASE("no leak through rvalue transpose of Some")
+{
+    InstanceCounter::reset();
+    {
+        auto outer = res::Result<res::Option<InstanceCounter>, int>::Ok(
+            res::Option<InstanceCounter>::Some(InstanceCounter{31}));
+        auto transposed = std::move(outer).transpose();
+        REQUIRE(transposed.is_some());
+        CHECK(transposed.unwrap().unwrap().id == 31);
+    }
+    CHECK(InstanceCounter::live == 0);
+}
+
+TEST_CASE("no leak through rvalue transpose of None")
+{
+    InstanceCounter::reset();
+    {
+        auto outer = res::Result<res::Option<InstanceCounter>, int>::Ok(
+            res::Option<InstanceCounter>::None());
+        auto transposed = std::move(outer).transpose();
+        CHECK(transposed.is_none());
+    }
+    CHECK(InstanceCounter::live == 0);
+}
+
+TEST_CASE("no leak through rvalue transpose of an outer Err")
+{
+    InstanceCounter::reset();
+    {
+        auto outer =
+            res::Result<res::Option<int>, InstanceCounter>::Err(InstanceCounter{32});
+        auto transposed = std::move(outer).transpose();
+        REQUIRE(transposed.is_some());
+        CHECK(transposed.unwrap().unwrap_err().id == 32);
     }
     CHECK(InstanceCounter::live == 0);
 }

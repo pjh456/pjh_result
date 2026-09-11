@@ -1343,10 +1343,12 @@ namespace pjh::result
             if (is_ok())
             {
                 auto inner = std::move(ok_);
+                destroy_();
                 tag_ = detail::Tag::Moved;
                 return inner;
             }
             auto e = std::move(err_);
+            destroy_();
             tag_ = detail::Tag::Moved;
             return Result<detail::result_value_t<U>, E>::Err(std::move(e));
         }
@@ -1426,20 +1428,24 @@ namespace pjh::result
                     if constexpr (std::is_void_v<InnerV>)
                     {
                         std::move(ok_).unwrap();
+                        destroy_();
                         tag_ = detail::Tag::Moved;
                         return Out::Some(Result<void, E>::Ok());
                     }
                     else
                     {
                         auto v = std::move(ok_).unwrap();
+                        destroy_();
                         tag_ = detail::Tag::Moved;
                         return Out::Some(Result<InnerV, E>::Ok(std::move(v)));
                     }
                 }
+                destroy_();
                 tag_ = detail::Tag::Moved;
                 return Out::None();
             }
             auto e = std::move(err_);
+            destroy_();
             tag_ = detail::Tag::Moved;
             return Out::Some(Result<InnerV, E>::Err(std::move(e)));
         }
