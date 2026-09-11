@@ -76,6 +76,13 @@ namespace
         }
     };
 
+    // Task 28: a void-returning error callable would form the illegal `Result<T, void>`
+    // and must be rejected at overload resolution.
+    struct VoidMapErr
+    {
+        void operator()(const std::string &) const {}
+    };
+
     // Task 21: returns a Result and is invocable only with an rvalue `int&&`. The
     // const& overload of and_then must reject it cleanly (SFINAE via the
     // cref_result_t fallback) instead of hard-erroring, while the && overload
@@ -113,6 +120,12 @@ concept RvalueAndThenCompat = requires(R &&r, F f) {
 template <typename R, typename F>
 concept ErrCompat = requires(const R &r, F f) {
     r.is_err_and(f);
+    r.map_err(f);
+};
+
+/// Whether `map_err` accepts `F` (used for the void-result negative assertion).
+template <typename R, typename F>
+concept MapErrCompat = requires(const R &r, F f) {
     r.map_err(f);
 };
 
@@ -157,6 +170,11 @@ static_assert(ErrCompat<StrResult, ErrorToLong>);
 static_assert(!ErrCompat<StrResult, RvalueErrOnly>);
 static_assert(MapOrElseCompat<StrResult, ErrorToLong>);
 static_assert(!MapOrElseCompat<StrResult, RvalueErrOnly>);
+
+// 编译期：map_err 拒绝返回 void 的 F（否则会构成非法的 Result<T, void>），
+// 并且是干净的 SFINAE 拒绝而非函数体硬错。
+static_assert(MapErrCompat<StrResult, ErrorToLong>);
+static_assert(!MapErrCompat<StrResult, VoidMapErr>);
 
 // 编译期：map_err 返回类型以 `const E&` 推导，与 const 成员的实际调用形式一致；
 // 不可调用 F 时 map_err_result_t 退化为 void（Clang 返回类型替换不硬错）。

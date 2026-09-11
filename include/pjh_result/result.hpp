@@ -1055,11 +1055,14 @@ namespace pjh::result
          * On Err(e), returns `Err(f(e))`; on Ok, returns `Ok` unchanged (`Ok()` when `T = void`).
          *
          * @tparam F the transform callable
-         * @param f callable taking the error as `const E&` and returning `G`
+         * @param f callable taking the error as `const E&` and returning a non-void `G`
          * @return `Result<T, G>`
+         * @note A callable whose result is `void` is rejected (it would form the illegal
+         *       `Result<T, void>`).
          */
         template <typename F>
-            requires std::invocable<F, const E &>
+            requires std::invocable<F, const E &> &&
+                     (!std::is_void_v<std::invoke_result_t<F, const E &>>)
         [[nodiscard]] auto map_err(F &&f) const
             -> Result<T, detail::map_err_result_t<F, E>>
             requires detail::ValidResultTypes<T, detail::map_err_result_t<F, E>> &&

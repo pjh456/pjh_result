@@ -1357,12 +1357,14 @@ namespace pjh::result
          * @brief Converts to `Result<T, E>`: Some becomes `Ok`, None invokes `f()` to
          * produce `Err`.
          *
-         * @tparam F nullary callable returning `E`
+         * @tparam F nullary callable returning a non-void `E`
          * @param f the error producer invoked when None
          * @return `Result<T, E>`
+         * @note A callable whose result is `void` is rejected (it would form the illegal
+         *       `Result<T, void>`).
          */
         template <typename F>
-            requires std::invocable<F>
+            requires std::invocable<F> && (!std::is_void_v<std::invoke_result_t<F>>)
         [[nodiscard]] auto ok_or_else(F &&f) const -> Result<T, std::invoke_result_t<F>>
         {
             using E = std::invoke_result_t<F>;

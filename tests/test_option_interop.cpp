@@ -7,6 +7,34 @@
 
 namespace res = pjh::result;
 
+namespace
+{
+    // Task 28: a void-returning producer would form the illegal `Result<T, void>`
+    // and must be rejected at overload resolution.
+    struct VoidProducer
+    {
+        void operator()() const {}
+    };
+
+    struct StringProducer
+    {
+        std::string operator()() const
+        {
+            return "missing";
+        }
+    };
+}
+
+/// Whether `ok_or_else` accepts the nullary callable `F`.
+template <typename O, typename F>
+concept OkOrElseCompat = requires(const O &o, F f) {
+    o.ok_or_else(f);
+};
+
+// 编译期：ok_or_else 接受返回非 void 的 F，干净拒绝返回 void 的 F。
+static_assert(OkOrElseCompat<res::Option<int>, StringProducer>);
+static_assert(!OkOrElseCompat<res::Option<int>, VoidProducer>);
+
 TEST_CASE("ok_or converts Some to Ok, None to Err")
 {
     auto s = res::Option<int>::Some(7);
