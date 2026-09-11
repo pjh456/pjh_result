@@ -12,10 +12,10 @@
  * @endcode
  *
  * Unlike `pjh_result/format.hpp` this header needs no feature guard: it only uses
- * `<ostream>` / `<sstream>`. The rendered representation matches the
- * `std::formatter` specialization for scalar elements; elements are streamed with
- * their own `operator<<`, so a `std::string` error is printed unquoted while
- * `std::format` would quote it.
+ * `<ostream>` / `<sstream>`. Both headers render the same `Ok(...)` / `Err(...)` /
+ * `Some(...)` / `None` shape, but this path produces elements with their own
+ * `operator<<` whereas `format.hpp` uses their `std::formatter`; for a type that
+ * defines only one of the two, element text can differ.
  */
 #ifndef INCLUDE_PJH_RESULT_IO_HPP
 #define INCLUDE_PJH_RESULT_IO_HPP
