@@ -44,6 +44,10 @@ template <typename O>
 concept LvalueAsMut = requires(O &o) { o.as_mut(); };
 template <typename O>
 concept RvalueAsMut = requires(O o) { std::move(o).as_mut(); };
+template <typename O>
+concept RvalueAsRef = requires(O &&o) { std::move(o).as_ref(); };
+template <typename O>
+concept ConstRvalueAsRef = requires(const O &&o) { std::move(o).as_ref(); };
 
 // 编译期：cv 限定与可用性
 static_assert(ConstAsRef<IntOpt>);
@@ -61,6 +65,16 @@ static_assert(!LvalueAsMut<res::Option<void>>);
 // 编译期：非 const 左值才可取可变借用，右值不可
 static_assert(!RvalueAsMut<IntOpt>);
 static_assert(!RvalueAsMut<StrResult>);
+
+// 编译期：右值（含 const 右值）不可取借用视图，避免悬垂
+static_assert(!RvalueAsRef<IntOpt>);
+static_assert(!RvalueAsRef<StrResult>);
+static_assert(!RvalueAsRef<VoidErrorResult>);
+static_assert(!RvalueAsRef<res::Option<void>>);
+static_assert(!ConstRvalueAsRef<IntOpt>);
+static_assert(!ConstRvalueAsRef<StrResult>);
+static_assert(!ConstRvalueAsRef<VoidErrorResult>);
+static_assert(!ConstRvalueAsRef<res::Option<void>>);
 
 TEST_CASE("Option::as_ref borrows Some and keeps None")
 {

@@ -429,6 +429,16 @@ namespace pjh::result
             return is_ok() ? R::Ok(std::cref(ok_)) : R::Err(std::cref(err_));
         }
 
+        /// @brief Deleted: a view into a temporary would dangle.
+        template <typename U = T>
+            requires(!std::is_void_v<U>)
+        auto as_ref() && = delete;
+
+        /// @brief Deleted: a view into a temporary would dangle.
+        template <typename U = T>
+            requires(!std::is_void_v<U>)
+        auto as_ref() const && = delete;
+
         /**
          * @brief Returns a mutable borrowing view of the active branch.
          *
@@ -468,6 +478,12 @@ namespace pjh::result
             require_not_moved_();
             return is_ok() ? R::Ok() : R::Err(std::cref(err_));
         }
+
+        /// @brief Deleted: a view into a temporary would dangle.
+        auto as_ref() && = delete;
+
+        /// @brief Deleted: a view into a temporary would dangle.
+        auto as_ref() const && = delete;
 
         /**
          * @brief Returns a mutable borrowing view of the error branch when `T = void`.

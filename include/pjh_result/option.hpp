@@ -270,6 +270,16 @@ namespace pjh::result
             return has_value_ ? R::Some(std::cref(value_)) : R::None();
         }
 
+        /// @brief Deleted: a view into a temporary would dangle.
+        template <typename U = T>
+            requires(!std::is_void_v<U>)
+        auto as_ref() && = delete;
+
+        /// @brief Deleted: a view into a temporary would dangle.
+        template <typename U = T>
+            requires(!std::is_void_v<U>)
+        auto as_ref() const && = delete;
+
         /**
          * @brief Returns a mutable borrowing view of the contained value or `None`.
          *
