@@ -1581,6 +1581,11 @@ namespace pjh::result
          *
          * @return `Some(value)` when Ok, otherwise `None`
          * @throws bad_result_access when `*this` is in the Moved state
+         * @note Declared here but defined out-of-line in `pjh_result/interop.hpp`,
+         *       which sees the complete `Option`. Include the umbrella
+         *       `pjh_result.hpp` (or `pjh_result/interop.hpp`) to use this member;
+         *       the class headers alone leave `Option` incomplete and the
+         *       definition absent.
          */
         [[nodiscard]] Option<T> ok() const &;
         /// @overload (rvalue: moves the value out)
@@ -1595,6 +1600,11 @@ namespace pjh::result
          *
          * @return `Some(error)` when Err, otherwise `None`
          * @throws bad_result_access when `*this` is in the Moved state
+         * @note Declared here but defined out-of-line in `pjh_result/interop.hpp`,
+         *       which sees the complete `Option`. Include the umbrella
+         *       `pjh_result.hpp` (or `pjh_result/interop.hpp`) to use this member;
+         *       the class headers alone leave `Option` incomplete and the
+         *       definition absent.
          */
         [[nodiscard]] Option<E> err() const &;
         /// @overload (rvalue: moves the error out)

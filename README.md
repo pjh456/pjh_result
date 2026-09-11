@@ -86,6 +86,7 @@ int main()
 | Transform | `map(f)`, `map_err(f)`, `map_or(def, f)`, `map_or_else(d, f)`, `inspect(f)`, `inspect_err(f)` |
 | Chain & flatten | `and_then(f)`, `or_else(f)`, `flatten()` |
 | Transpose | `transpose()` → `Option<Result<U,E>>` ↔ `Result<Option<U>,E>` |
+| To Option | `ok()`, `err()` (defined in `interop.hpp`) |
 | Propagate | `ASSIGN_OR_RETURN(name, expr)`, `TRY(expr)` (from `macros.hpp`) |
 
 Accessor methods on the wrong state (`unwrap()` on `Err` or `Moved`, etc.) throw
@@ -113,16 +114,19 @@ Accessor methods on the wrong state (`unwrap()` on `Err` or `Moved`, etc.) throw
 
 ## Converting between the two
 
-`Option → Result` is a member (`ok_or` / `ok_or_else`). The reverse direction lives in
-`pjh_result/interop.hpp` (pulled in by the umbrella `pjh_result.hpp`) as free
-functions, kept out of the class headers to avoid a circular include:
+`Option → Result` is a member (`ok_or` / `ok_or_else`). The reverse direction is the
+members `Result::ok()` / `Result::err()` plus the free functions `res::ok(r)` /
+`res::err(r)`. These are defined in `pjh_result/interop.hpp` to avoid a circular
+include; `result.hpp` only *declares* the members. The class headers alone leave the
+return type `Option` incomplete and the definition absent, so code that calls them must
+include the umbrella `pjh_result.hpp` (or `pjh_result/interop.hpp`):
 
 ```cpp
 #include "pjh_result.hpp"
 
 res::Result<int, std::string> r = /* ... */;
-res::Option<int> maybe = res::ok(r);   // Ok -> Some, Err -> None (discards error)
-res::Option<std::string> e = res::err(r); // Err -> Some, Ok -> None
+res::Option<int> maybe = r.ok();          // member form: Ok -> Some, Err -> None
+res::Option<std::string> e = res::err(r); // free-function form: Err -> Some, Ok -> None
 ```
 
 ## Examples

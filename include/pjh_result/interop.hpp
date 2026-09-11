@@ -8,6 +8,10 @@
  * is declared in `result.hpp` (which forward-declares `Option`) and defined here, where
  * both types are complete. The free functions `ok()` / `err()` are thin wrappers that
  * delegate to the members.
+ *
+ * @note This header is not included by `result.hpp` or `option.hpp`. Include it
+ *       directly or use the umbrella `pjh_result.hpp` to obtain these definitions;
+ *       `result.hpp` only declares the `Result::ok()` / `Result::err()` members.
  */
 #ifndef INCLUDE_PJH_RESULT_INTEROP_HPP
 #define INCLUDE_PJH_RESULT_INTEROP_HPP
@@ -103,6 +107,8 @@ namespace pjh::result
      * @tparam E error value type
      * @param r the result to convert
      * @return `Some(value)` if @p r is Ok, otherwise `None`
+     * @note Not declared by `result.hpp`; include the umbrella `pjh_result.hpp`
+     *       or this header.
      */
     template <typename T, typename E>
     [[nodiscard]] Option<T> ok(const Result<T, E> &r)
@@ -117,6 +123,8 @@ namespace pjh::result
      * @tparam E error value type
      * @param r the result to convert (consumed)
      * @return `Some(value)` if @p r is Ok, otherwise `None`
+     * @note Not declared by `result.hpp`; include the umbrella `pjh_result.hpp`
+     *       or this header.
      */
     template <typename T, typename E>
     [[nodiscard]] Option<T> ok(Result<T, E> &&r)
@@ -133,6 +141,8 @@ namespace pjh::result
      * @tparam E error value type
      * @param r the result to convert
      * @return `Some(error)` if @p r is Err, otherwise `None`
+     * @note Not declared by `result.hpp`; include the umbrella `pjh_result.hpp`
+     *       or this header.
      */
     template <typename T, typename E>
     [[nodiscard]] Option<E> err(const Result<T, E> &r)
@@ -147,6 +157,8 @@ namespace pjh::result
      * @tparam E error value type
      * @param r the result to convert (consumed)
      * @return `Some(error)` if @p r is Err, otherwise `None`
+     * @note Not declared by `result.hpp`; include the umbrella `pjh_result.hpp`
+     *       or this header.
      */
     template <typename T, typename E>
     [[nodiscard]] Option<E> err(Result<T, E> &&r)
