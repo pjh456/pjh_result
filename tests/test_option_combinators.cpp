@@ -22,7 +22,30 @@ namespace
 
     template <typename T>
     concept HasUnzip = requires(T t) { t.unzip(); };
+
+    std::string join_int_str(int v, const std::string &s)
+    {
+        return std::to_string(v) + s;
+    }
 }
+
+// 编译期：跨值类型 zip / zip_with 的返回类型
+static_assert(std::is_same_v<
+              decltype(std::declval<const IntOpt &>().zip(
+                  std::declval<res::Option<std::string>>())),
+              res::Option<std::pair<int, std::string>>>);
+static_assert(std::is_same_v<
+              decltype(std::declval<IntOpt>().zip(
+                  std::declval<res::Option<std::string>>())),
+              res::Option<std::pair<int, std::string>>>);
+static_assert(std::is_same_v<
+              decltype(std::declval<const IntOpt &>().zip_with(
+                  std::declval<res::Option<std::string>>(), join_int_str)),
+              res::Option<std::string>>);
+static_assert(std::is_same_v<
+              decltype(std::declval<IntOpt>().zip_with(
+                  std::declval<res::Option<std::string>>(), join_int_str)),
+              res::Option<std::string>>);
 
 // 编译期：右值调用按值返回，左值调用仍返回 const 引用
 static_assert(std::is_same_v<
@@ -271,6 +294,63 @@ TEST_CASE("zip_with rvalue moves values into combiner")
         { return x + " " + y; });
     CHECK(z.is_some());
     CHECK(z.unwrap() == "hello world");
+}
+
+TEST_CASE("zip supports different value types")
+{
+    auto a = res::Option<int>::Some(1);
+    auto b = res::Option<std::string>::Some(std::string("x"));
+    auto none_str = res::Option<std::string>::None();
+    auto none_int = res::Option<int>::None();
+
+    auto z = a.zip(b);
+    CHECK(z.is_some());
+    CHECK(z.unwrap() == std::make_pair(1, std::string("x")));
+
+    CHECK(a.zip(none_str).is_none());
+    CHECK(none_int.zip(b).is_none());
+    CHECK(none_int.zip(none_str).is_none());
+}
+
+TEST_CASE("zip rvalue supports different value types and moves")
+{
+    auto a = res::Option<int>::Some(2);
+    auto b = res::Option<std::string>::Some(std::string("moved"));
+    auto z = std::move(a).zip(std::move(b));
+    CHECK(z.is_some());
+    CHECK(z.unwrap() == std::make_pair(2, std::string("moved")));
+
+    auto c = res::Option<int>::Some(3);
+    CHECK(std::move(c).zip(res::Option<std::string>::None()).is_none());
+}
+
+TEST_CASE("zip_with supports different value types")
+{
+    auto a = res::Option<int>::Some(2);
+    auto b = res::Option<std::string>::Some(std::string("b"));
+    auto none_str = res::Option<std::string>::None();
+    auto none_int = res::Option<int>::None();
+
+    auto z = a.zip_with(b, join_int_str);
+    CHECK(z.is_some());
+    CHECK(z.unwrap() == "2b");
+
+    CHECK(a.zip_with(none_str, join_int_str).is_none());
+    CHECK(none_int.zip_with(b, join_int_str).is_none());
+}
+
+TEST_CASE("zip_with rvalue supports different value types and moves")
+{
+    auto a = res::Option<int>::Some(3);
+    auto b = res::Option<std::string>::Some(std::string("!"));
+    auto z = std::move(a).zip_with(std::move(b), join_int_str);
+    CHECK(z.is_some());
+    CHECK(z.unwrap() == "3!");
+
+    auto c = res::Option<int>::Some(4);
+    CHECK(std::move(c)
+              .zip_with(res::Option<std::string>::None(), join_int_str)
+              .is_none());
 }
 
 TEST_CASE("inspect rvalue observes only Some and returns by value")

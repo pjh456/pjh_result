@@ -55,6 +55,12 @@ namespace pjh::result
     class [[nodiscard]] Option
     {
     private:
+        /// @brief Grants every `Option<U>` specialization access to the state of other
+        ///        instantiations, so cross-value-type `zip` / `zip_with` can read both
+        ///        operands.
+        template <typename>
+        friend class Option;
+
         /// @brief Actual storage type; degrades to `Unit` when `T = void`.
         using StoredT = std::conditional_t<std::is_void_v<T>, Unit, T>;
 
