@@ -308,9 +308,9 @@ TEST_CASE("inspect_err accepts callable taking E & (non-const lvalue ref)")
 TEST_CASE("map throws on moved Result")
 {
     auto r = res::Result<int, std::string>::Ok(5);
-    std::move(r).unwrap();
+    (void)std::move(r).unwrap();
     CHECK_THROWS_AS(
-        r.map(
+        (void)r.map(
             [](int v)
             { return v * 2; }),
         bad_access);
@@ -319,9 +319,9 @@ TEST_CASE("map throws on moved Result")
 TEST_CASE("map_err throws on moved Result")
 {
     auto r = res::Result<int, std::string>::Ok(5);
-    std::move(r).unwrap();
+    (void)std::move(r).unwrap();
     CHECK_THROWS_AS(
-        r.map_err(
+        (void)r.map_err(
             [](const std::string &e)
             { return e.size(); }),
         bad_access);
@@ -330,9 +330,9 @@ TEST_CASE("map_err throws on moved Result")
 TEST_CASE("map_or_else throws on moved Result")
 {
     auto r = res::Result<int, std::string>::Ok(5);
-    std::move(r).unwrap();
+    (void)std::move(r).unwrap();
     CHECK_THROWS_AS(
-        r.map_or_else(
+        (void)r.map_or_else(
             [](const std::string &e)
             { return static_cast<int>(e.size()); },
             [](int v)
@@ -364,9 +364,9 @@ TEST_CASE("inspect and inspect_err throw on moved Result")
 TEST_CASE("and_then throws on moved Result")
 {
     auto r = res::Result<int, std::string>::Ok(5);
-    std::move(r).unwrap();
+    (void)std::move(r).unwrap();
     CHECK_THROWS_AS(
-        r.and_then(
+        (void)r.and_then(
             [](int x)
             { return res::Result<int, std::string>::Ok(x + 1); }),
         bad_access);
@@ -375,9 +375,9 @@ TEST_CASE("and_then throws on moved Result")
 TEST_CASE("or_else throws on moved Result")
 {
     auto r = res::Result<int, std::string>::Ok(5);
-    std::move(r).unwrap();
+    (void)std::move(r).unwrap();
     CHECK_THROWS_AS(
-        r.or_else(
+        (void)r.or_else(
             [](const std::string &)
             { return res::Result<int, std::string>::Ok(0); }),
         bad_access);
@@ -386,9 +386,9 @@ TEST_CASE("or_else throws on moved Result")
 TEST_CASE("unwrap_or_else throws on moved Result")
 {
     auto r = res::Result<int, std::string>::Ok(5);
-    std::move(r).unwrap();
+    (void)std::move(r).unwrap();
     CHECK_THROWS_AS(
-        r.unwrap_or_else(
+        (void)r.unwrap_or_else(
             [](const std::string &)
             { return -1; }),
         bad_access);
@@ -398,8 +398,8 @@ TEST_CASE("operator== throws on moved Result")
 {
     auto a = res::Result<int, std::string>::Ok(1);
     auto b = res::Result<int, std::string>::Ok(2);
-    std::move(a).unwrap();
-    std::move(b).unwrap();
+    (void)std::move(a).unwrap();
+    (void)std::move(b).unwrap();
     CHECK_THROWS_AS((void)(a == b), bad_access);
 }
 
@@ -668,7 +668,7 @@ TEST_CASE("Result<void, E>::or_with keeps Ok or takes other")
 TEST_CASE("and_with and or_with throw on moved Result")
 {
     auto r = StrResult::Ok(5);
-    std::move(r).unwrap();
+    (void)std::move(r).unwrap();
     CHECK_THROWS_AS(
         (void)r.and_with(res::Result<long, std::string>::Ok(1L)), bad_access);
     CHECK_THROWS_AS((void)r.or_with(res::Result<int, std::size_t>::Ok(9)), bad_access);
@@ -744,7 +744,7 @@ TEST_CASE("unwrap_err_or_else works with a move-only success value")
 TEST_CASE("unwrap_err_or_else throws on moved Result")
 {
     auto r = StrResult::Ok(5);
-    std::move(r).unwrap();
+    (void)std::move(r).unwrap();
     CHECK_THROWS_AS(
         (void)r.unwrap_err_or_else(
             [](const int &)

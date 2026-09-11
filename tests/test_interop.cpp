@@ -130,8 +130,8 @@ TEST_CASE("member ok/err throw on a moved Result")
     IntResult r = IntResult::Ok(7);
     CHECK(std::move(r).unwrap() == 7);
     CHECK(r.is_moved());
-    CHECK_THROWS_AS(r.ok(), bad_access);
-    CHECK_THROWS_AS(r.err(), bad_access);
+    CHECK_THROWS_AS((void)r.ok(), bad_access);
+    CHECK_THROWS_AS((void)r.err(), bad_access);
 }
 
 TEST_CASE("member ok chains into Option combinators")
@@ -184,8 +184,8 @@ TEST_CASE("member ok on a moved void Result throws")
     auto o = std::move(v).ok();
     CHECK(o.is_some());
     CHECK(v.is_moved());
-    CHECK_THROWS_AS(v.ok(), bad_access);
-    CHECK_THROWS_AS(v.err(), bad_access);
+    CHECK_THROWS_AS((void)v.ok(), bad_access);
+    CHECK_THROWS_AS((void)v.err(), bad_access);
 }
 
 TEST_CASE("free ok/err throw on a moved Result")
@@ -195,10 +195,10 @@ TEST_CASE("free ok/err throw on a moved Result")
     IntResult r = IntResult::Ok(7);
     CHECK(std::move(r).unwrap() == 7);
     CHECK(r.is_moved());
-    CHECK_THROWS_AS(res::ok(r), bad_access);
-    CHECK_THROWS_AS(res::err(r), bad_access);
-    CHECK_THROWS_AS(res::ok(std::move(r)), bad_access);
-    CHECK_THROWS_AS(res::err(std::move(r)), bad_access);
+    CHECK_THROWS_AS((void)res::ok(r), bad_access);
+    CHECK_THROWS_AS((void)res::err(r), bad_access);
+    CHECK_THROWS_AS((void)res::ok(std::move(r)), bad_access);
+    CHECK_THROWS_AS((void)res::err(std::move(r)), bad_access);
 }
 
 TEST_CASE("free ok/err on a moved void Result throw")
@@ -209,8 +209,8 @@ TEST_CASE("free ok/err on a moved void Result throw")
     auto o = std::move(v).ok();
     CHECK(o.is_some());
     CHECK(v.is_moved());
-    CHECK_THROWS_AS(res::ok(v), bad_access);
-    CHECK_THROWS_AS(res::err(v), bad_access);
+    CHECK_THROWS_AS((void)res::ok(v), bad_access);
+    CHECK_THROWS_AS((void)res::err(v), bad_access);
 }
 
 TEST_CASE("free ok/err mirror the member results")

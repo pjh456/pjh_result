@@ -149,8 +149,8 @@ TEST_CASE("Result::as_ref and as_mut throw when moved")
     auto r = StrResult::Ok(1);
     (void)std::move(r).unwrap();
     CHECK(r.is_moved());
-    CHECK_THROWS_AS(r.as_ref(), res::bad_result_access);
-    CHECK_THROWS_AS(r.as_mut(), res::bad_result_access);
+    CHECK_THROWS_AS((void)r.as_ref(), res::bad_result_access);
+    CHECK_THROWS_AS((void)r.as_mut(), res::bad_result_access);
 }
 
 TEST_CASE("as_ref views compose with map and and_then")
