@@ -1247,6 +1247,34 @@ namespace pjh::result
         }
 
         /**
+         * @brief Converts to `Option<T>`, discarding any error (Rust `Result::ok`).
+         *
+         * Ok becomes `Some` (`Some()` when `T = void`); Err becomes `None`. The `const&`
+         * overload copies the success value and leaves `*this` unchanged; the `&&`
+         * overload moves it out and leaves `*this` in the Moved state.
+         *
+         * @return `Some(value)` when Ok, otherwise `None`
+         * @throws bad_result_access when `*this` is in the Moved state
+         */
+        [[nodiscard]] Option<T> ok() const &;
+        /// @overload (rvalue: moves the value out)
+        [[nodiscard]] Option<T> ok() &&;
+
+        /**
+         * @brief Converts to `Option<E>`, discarding any success value (Rust `Result::err`).
+         *
+         * Err becomes `Some`; Ok becomes `None`. The `const&` overload copies the error
+         * and leaves `*this` unchanged; the `&&` overload moves it out and leaves
+         * `*this` in the Moved state.
+         *
+         * @return `Some(error)` when Err, otherwise `None`
+         * @throws bad_result_access when `*this` is in the Moved state
+         */
+        [[nodiscard]] Option<E> err() const &;
+        /// @overload (rvalue: moves the error out)
+        [[nodiscard]] Option<E> err() &&;
+
+        /**
          * @brief Transposes a `Result<Option<U>, E>` into `Option<Result<U, E>>`.
          *
          * `Ok(Some(u))` becomes `Some(Ok(u))`, `Ok(None)` becomes `None`,
