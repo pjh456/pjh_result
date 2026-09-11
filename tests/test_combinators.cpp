@@ -1,6 +1,7 @@
 #include <doctest/doctest.h>
 
 #include <cstddef>
+#include <memory>
 #include <string>
 #include <type_traits>
 #include <utility>
@@ -409,4 +410,125 @@ TEST_CASE("lvalue inspect keeps returning a reference to self")
     const auto &same = r.inspect(&observe_ok);
     CHECK(&same == &r);
     CHECK(r.is_ok());
+}
+
+// 编译期：and_with 取 other 的成功类型 U 并保留 E；or_with 保留 T 并取 other 的错误类型 F
+static_assert(std::is_same_v<
+              decltype(std::declval<StrResult &>().and_with(
+                  std::declval<res::Result<long, std::string>>())),
+              res::Result<long, std::string>>);
+static_assert(std::is_same_v<
+              decltype(std::declval<StrResult &>().or_with(
+                  std::declval<res::Result<int, std::size_t>>())),
+              res::Result<int, std::size_t>>);
+static_assert(std::is_same_v<
+              decltype(std::declval<res::Result<void, std::string>>().and_with(
+                  std::declval<res::Result<int, std::string>>())),
+              res::Result<int, std::string>>);
+static_assert(std::is_same_v<
+              decltype(std::declval<res::Result<void, std::string>>().or_with(
+                  std::declval<res::Result<void, std::size_t>>())),
+              res::Result<void, std::size_t>>);
+
+TEST_CASE("and_with returns other on Ok")
+{
+    auto r = res::Result<int, long>::Ok(3).and_with(
+        res::Result<std::string, long>::Ok(std::string("x")));
+    CHECK(r.is_ok());
+    CHECK(r.unwrap() == "x");
+}
+
+TEST_CASE("and_with propagates the error on Err")
+{
+    auto r = StrResult::Err(std::string("e")).and_with(
+        res::Result<long, std::string>::Ok(1L));
+    CHECK(r.is_err());
+    CHECK(r.unwrap_err() == "e");
+}
+
+TEST_CASE("and_with const lvalue copies other")
+{
+    res::Result<int, long> base = res::Result<int, long>::Ok(1);
+    res::Result<std::string, long> other =
+        res::Result<std::string, long>::Ok(std::string("x"));
+    auto r = base.and_with(other);
+    CHECK(r.unwrap() == "x");
+    CHECK(other.is_ok()); // other left intact
+}
+
+TEST_CASE("and_with rvalue moves a move-only other")
+{
+    auto r = StrResult::Ok(1).and_with(
+        res::Result<std::unique_ptr<int>, std::string>::Ok(
+            std::unique_ptr<int>(new int(9))));
+    CHECK(r.is_ok());
+    CHECK(*r.unwrap() == 9);
+}
+
+TEST_CASE("or_with keeps Ok and replaces Err")
+{
+    auto kept = StrResult::Ok(3).or_with(res::Result<int, std::size_t>::Ok(9));
+    CHECK(kept.is_ok());
+    CHECK(kept.unwrap() == 3);
+
+    auto recovered =
+        StrResult::Err(std::string("e")).or_with(res::Result<int, std::size_t>::Ok(9));
+    CHECK(recovered.is_ok());
+    CHECK(recovered.unwrap() == 9);
+
+    auto still_err = StrResult::Err(std::string("e"))
+                         .or_with(res::Result<int, std::size_t>::Err(std::size_t{7}));
+    CHECK(still_err.is_err());
+    CHECK(still_err.unwrap_err() == std::size_t{7});
+}
+
+TEST_CASE("or_with const lvalue copies the Ok value")
+{
+    StrResult base = StrResult::Ok(3);
+    auto r = base.or_with(res::Result<int, std::size_t>::Ok(9));
+    CHECK(r.unwrap() == 3);
+    CHECK(base.is_ok());
+}
+
+TEST_CASE("or_with rvalue moves a move-only Ok value")
+{
+    auto base = res::Result<std::unique_ptr<int>, std::string>::Ok(
+        std::unique_ptr<int>(new int(3)));
+    auto r = std::move(base).or_with(
+        res::Result<std::unique_ptr<int>, std::size_t>::Err(std::size_t{1}));
+    CHECK(r.is_ok());
+    CHECK(*r.unwrap() == 3);
+}
+
+TEST_CASE("Result<void, E>::and_with yields other or propagates")
+{
+    auto r = res::Result<void, std::string>::Ok().and_with(
+        res::Result<int, std::string>::Ok(7));
+    CHECK(r.unwrap() == 7);
+
+    auto e = res::Result<void, std::string>::Err(std::string("e")).and_with(
+        res::Result<int, std::string>::Ok(7));
+    CHECK(e.is_err());
+    CHECK(e.unwrap_err() == "e");
+}
+
+TEST_CASE("Result<void, E>::or_with keeps Ok or takes other")
+{
+    auto ok = res::Result<void, std::string>::Ok().or_with(
+        res::Result<void, std::size_t>::Err(std::size_t{1}));
+    CHECK(ok.is_ok());
+
+    auto rec = res::Result<void, std::string>::Err(std::string("e")).or_with(
+        res::Result<void, std::size_t>::Err(std::size_t{1}));
+    CHECK(rec.is_err());
+    CHECK(rec.unwrap_err() == std::size_t{1});
+}
+
+TEST_CASE("and_with and or_with throw on moved Result")
+{
+    auto r = StrResult::Ok(5);
+    std::move(r).unwrap();
+    CHECK_THROWS_AS(
+        (void)r.and_with(res::Result<long, std::string>::Ok(1L)), bad_access);
+    CHECK_THROWS_AS((void)r.or_with(res::Result<int, std::size_t>::Ok(9)), bad_access);
 }

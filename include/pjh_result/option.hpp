@@ -896,6 +896,63 @@ namespace pjh::result
         }
 
         /**
+         * @brief Returns @p other if `*this` is Some, otherwise `None`.
+         *
+         * The eager counterpart of `and_then` (Rust `Option::and`): no closure is
+         * involved, so @p other is evaluated unconditionally. The value type becomes
+         * `U` (that of @p other).
+         *
+         * @tparam U value type of @p other
+         * @param other the option yielded when `*this` is Some
+         * @return @p other if Some, otherwise `None`
+         */
+        template <typename U>
+        [[nodiscard]] Option<U> and_with(Option<U> other) const &
+        {
+            if (has_value_)
+                return other;
+            return Option<U>::None();
+        }
+
+        /// @overload (rvalue: consumes `*this`, which becomes `None`)
+        template <typename U>
+        [[nodiscard]] Option<U> and_with(Option<U> other) &&
+        {
+            if (has_value_)
+            {
+                destroy_();
+                has_value_ = false;
+                return other;
+            }
+            return Option<U>::None();
+        }
+
+        /**
+         * @brief Returns `*this` if Some, otherwise @p other.
+         *
+         * The eager counterpart of `or_else` (Rust `Option::or`): no closure is
+         * involved, so @p other is evaluated unconditionally. Both sides share the
+         * value type `T`.
+         *
+         * @param other the option yielded when `*this` is None
+         * @return `*this` if Some, otherwise @p other
+         */
+        [[nodiscard]] Option or_with(Option other) const &
+        {
+            if (has_value_)
+                return *this;
+            return other;
+        }
+
+        /// @overload (rvalue: moves the value out and leaves `*this` as `None`)
+        [[nodiscard]] Option or_with(Option other) &&
+        {
+            if (has_value_)
+                return take();
+            return other;
+        }
+
+        /**
          * @brief Keeps the value only if it satisfies @p pred, otherwise yields `None`.
          *
          * When `T = void`, `pred()` is called.

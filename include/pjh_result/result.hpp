@@ -1204,6 +1204,76 @@ namespace pjh::result
         }
 
         /**
+         * @brief Returns @p other if `*this` is Ok, otherwise propagates this error.
+         *
+         * The eager counterpart of `and_then` (Rust `Result::and`): no closure is
+         * involved, so @p other is evaluated unconditionally. The success type becomes
+         * `U` (that of @p other), while the error type `E` is preserved.
+         *
+         * @tparam U success type of @p other
+         * @param other the result yielded when `*this` is Ok
+         * @return @p other if Ok, otherwise `Err(e)` carrying this result's error
+         */
+        template <typename U>
+            requires detail::ValidResultTypes<U, E>
+        [[nodiscard]] Result<U, E> and_with(Result<U, E> other) const &
+        {
+            require_not_moved_();
+            if (is_ok())
+                return other;
+            return Result<U, E>::Err(err_);
+        }
+
+        /// @overload (rvalue: moves the error when `*this` is Err)
+        template <typename U>
+            requires detail::ValidResultTypes<U, E>
+        [[nodiscard]] Result<U, E> and_with(Result<U, E> other) &&
+        {
+            require_not_moved_();
+            if (is_ok())
+                return other;
+            return Result<U, E>::Err(std::move(err_));
+        }
+
+        /**
+         * @brief Returns `*this` if Ok, otherwise @p other.
+         *
+         * The eager counterpart of `or_else` (Rust `Result::or`): no closure is
+         * involved, so @p other is evaluated unconditionally. The success type `T` is
+         * preserved, while the error type becomes `F` (that of @p other).
+         *
+         * @tparam F error type of @p other (may differ from this result's error type)
+         * @param other the result yielded when `*this` is Err
+         * @return `*this` if Ok, otherwise @p other
+         */
+        template <typename F>
+            requires detail::ValidResultTypes<T, F> && detail::NotResult<F>
+        [[nodiscard]] Result<T, F> or_with(Result<T, F> other) const &
+        {
+            require_not_moved_();
+            if (is_err())
+                return other;
+            if constexpr (std::is_void_v<T>)
+                return Result<T, F>::Ok();
+            else
+                return Result<T, F>::Ok(ok_);
+        }
+
+        /// @overload (rvalue: moves the success value when `*this` is Ok)
+        template <typename F>
+            requires detail::ValidResultTypes<T, F> && detail::NotResult<F>
+        [[nodiscard]] Result<T, F> or_with(Result<T, F> other) &&
+        {
+            require_not_moved_();
+            if (is_err())
+                return other;
+            if constexpr (std::is_void_v<T>)
+                return Result<T, F>::Ok();
+            else
+                return Result<T, F>::Ok(std::move(ok_));
+        }
+
+        /**
          * @brief Flattens one level of nesting.
          *
          * On `Ok(inner)`, returns `inner`; on `Err(e)`, returns `Err(e)`.

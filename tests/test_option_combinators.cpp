@@ -322,3 +322,99 @@ TEST_CASE("lvalue inspect keeps returning a reference to self")
     CHECK(&same == &o);
     CHECK(o.is_some());
 }
+
+// 编译期：and_with 返回 Option<U>；or_with 保留 T 返回 Option<T>
+static_assert(std::is_same_v<
+              decltype(std::declval<IntOpt &>().and_with(
+                  std::declval<res::Option<long>>())),
+              res::Option<long>>);
+static_assert(std::is_same_v<
+              decltype(std::declval<IntOpt &>().or_with(std::declval<IntOpt>())),
+              IntOpt>);
+static_assert(std::is_same_v<
+              decltype(std::declval<res::Option<void>>().and_with(
+                  std::declval<res::Option<int>>())),
+              res::Option<int>>);
+
+TEST_CASE("and_with returns other on Some, None otherwise")
+{
+    CHECK(res::Option<int>::Some(1).and_with(res::Option<int>::Some(2)).unwrap() == 2);
+    CHECK(res::Option<int>::Some(1).and_with(res::Option<int>::None()).is_none());
+    CHECK(res::Option<int>::None().and_with(res::Option<int>::Some(2)).is_none());
+}
+
+TEST_CASE("and_with can change the value type")
+{
+    auto o = res::Option<int>::Some(1).and_with(
+        res::Option<std::string>::Some(std::string("x")));
+    CHECK(o.is_some());
+    CHECK(o.unwrap() == "x");
+}
+
+TEST_CASE("and_with const lvalue copies other and keeps the receiver")
+{
+    res::Option<int> base = res::Option<int>::Some(1);
+    res::Option<int> other = res::Option<int>::Some(2);
+    auto r = base.and_with(other);
+    CHECK(r.unwrap() == 2);
+    CHECK(other.is_some());
+}
+
+TEST_CASE("and_with rvalue consumes the receiver and moves other")
+{
+    auto src = res::Option<int>::Some(1);
+    auto r = std::move(src).and_with(
+        res::Option<std::unique_ptr<int>>::Some(std::unique_ptr<int>(new int(5))));
+    CHECK(*r.unwrap() == 5);
+    CHECK(src.is_none()); // receiver consumed
+}
+
+TEST_CASE("or_with keeps Some and replaces None")
+{
+    CHECK(res::Option<int>::Some(1).or_with(res::Option<int>::Some(2)).unwrap() == 1);
+    CHECK(res::Option<int>::None().or_with(res::Option<int>::Some(2)).unwrap() == 2);
+}
+
+TEST_CASE("or_with const lvalue copies the Some value")
+{
+    res::Option<int> base = res::Option<int>::Some(1);
+    auto r = base.or_with(res::Option<int>::Some(2));
+    CHECK(r.unwrap() == 1);
+    CHECK(base.is_some());
+}
+
+TEST_CASE("or_with rvalue moves the Some value and consumes the receiver")
+{
+    auto base =
+        res::Option<std::unique_ptr<int>>::Some(std::unique_ptr<int>(new int(3)));
+    auto r = std::move(base).or_with(res::Option<std::unique_ptr<int>>::None());
+    CHECK(*r.unwrap() == 3);
+    CHECK(base.is_none());
+}
+
+TEST_CASE("Option<void>::and_with and or_with follow presence")
+{
+    auto a = res::Option<void>::Some().and_with(res::Option<int>::Some(3));
+    CHECK(a.unwrap() == 3);
+    CHECK(res::Option<void>::None().and_with(res::Option<int>::Some(3)).is_none());
+
+    CHECK(res::Option<void>::Some()
+              .or_with(res::Option<void>::None())
+              .is_some());
+    CHECK(res::Option<void>::None().or_with(res::Option<void>::Some()).is_some());
+}
+
+TEST_CASE("and_with and or_with chain with map")
+{
+    auto r = res::Option<int>::Some(1)
+                 .and_with(res::Option<int>::Some(2))
+                 .map([](int v)
+                      { return v + 10; });
+    CHECK(r.unwrap() == 12);
+
+    auto kept = res::Option<int>::Some(1)
+                    .or_with(res::Option<int>::Some(0))
+                    .map([](int v)
+                         { return v * 2; });
+    CHECK(kept.unwrap() == 2);
+}
