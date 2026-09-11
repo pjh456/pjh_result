@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  push:
+    branches: [ "*" ]
+  pull_request:
+    branches: [ "main", "master" ]
+
+jobs:
+  test:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux (GCC)
+            os: ubuntu-latest
+            cc: gcc
+            cxx: g++
+            ccache_variant: ccache
+            cmake_args: ""
+          - name: Linux (Clang)
+            os: ubuntu-latest
+            cc: clang
+            cxx: clang++
+            ccache_variant: ccache
+            cmake_args: ""
+          - name: macOS
+            os: macos-latest
+            cc: clang
+            cxx: clang++
+            ccache_variant: ccache
+            cmake_args: ""
+          - name: Windows (MSVC)
+            os: windows-latest
+            cc: cl
+            cxx: cl
+            ccache_variant: ccache
+            cmake_args: ""
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Compiler cache
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          key: ${{ matrix.name }}
+          variant: ${{ matrix.ccache_variant }}
+
+      - name: Setup MSVC
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $vsPath = vswhere -latest -property installationPath
+          cmd /c "`"$vsPath\VC\Auxiliary\Build\vcvars64.bat`" >nul && set" | ForEach-Object { Add-Content $env:GITHUB_ENV $_ }
+
+      - name: Configure CMake
+        env:
+          CC: ${{ matrix.cc }}
+          CXX: ${{ matrix.cxx }}
+          CMAKE_C_COMPILER_LAUNCHER: ${{ matrix.ccache_variant }}
+          CMAKE_CXX_COMPILER_LAUNCHER: ${{ matrix.ccache_variant }}
+        run: cmake -B build -G Ninja -DPJH_RESULT_BUILD_TESTS=ON -DPJH_RESULT_BUILD_EXAMPLES=ON ${{ matrix.cmake_args }}
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
