@@ -21,6 +21,8 @@ no `valueless_by_exception`.
 ## Requirements
 
 - A C++20 compiler (concepts, `requires`-clauses).
+- CMake ≥ 3.20 for the CMake target (manual include-only use needs neither CMake
+  nor network access).
 
 ## Integration
 
@@ -112,8 +114,8 @@ Accessor methods on the wrong state (`unwrap()` on `Err` or `Moved`, etc.) throw
 ## Converting between the two
 
 `Option → Result` is a member (`ok_or` / `ok_or_else`). The reverse direction lives in
-`pjh_result.hpp` as free functions (kept out of the class headers to avoid a
-circular include):
+`pjh_result/interop.hpp` (pulled in by the umbrella `pjh_result.hpp`) as free
+functions, kept out of the class headers to avoid a circular include:
 
 ```cpp
 #include "pjh_result.hpp"
@@ -148,8 +150,10 @@ ctest --test-dir build
 
 Toggle with `-DPJH_RESULT_BUILD_TESTS=ON/OFF` and `-DPJH_RESULT_BUILD_EXAMPLES=ON/OFF`
 (both default to ON when this is the top-level project). Tests use
-[doctest](https://github.com/doctest/doctest), vendored as a git submodule under
-`tests/third_party/` — run `git submodule update --init --depth 1` first.
+[doctest](https://github.com/doctest/doctest) v2.5.0, a tests-only optional
+dependency fetched via CMake `FetchContent` at configure time — there is no
+submodule or vendored copy, so network access is required during the first
+configure when tests are enabled.
 
 ## License
 
