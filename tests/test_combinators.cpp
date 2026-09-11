@@ -6,6 +6,7 @@
 #include <type_traits>
 #include <utility>
 
+#include "pjh_result/option.hpp"
 #include "pjh_result/result.hpp"
 
 namespace res = pjh::result;
@@ -357,6 +358,24 @@ TEST_CASE("flatten rvalue on Err propagates")
     auto flat = std::move(outer).flatten();
     CHECK(flat.is_err());
     CHECK(flat.unwrap_err() == "e");
+}
+
+TEST_CASE("flatten throws on moved Result")
+{
+    using Nested = res::Result<res::Result<int, std::string>, std::string>;
+    auto r = Nested::Ok(res::Result<int, std::string>::Ok(1));
+    (void)std::move(r).unwrap();
+    CHECK_THROWS_AS((void)r.flatten(), bad_access);
+    CHECK_THROWS_AS((void)std::move(r).flatten(), bad_access);
+}
+
+TEST_CASE("transpose throws on moved Result")
+{
+    using Nested = res::Result<res::Option<int>, std::string>;
+    auto r = Nested::Ok(res::Option<int>::Some(1));
+    (void)std::move(r).unwrap();
+    CHECK_THROWS_AS((void)r.transpose(), bad_access);
+    CHECK_THROWS_AS((void)std::move(r).transpose(), bad_access);
 }
 
 TEST_CASE("inspect rvalue observes only the active branch and returns by value")

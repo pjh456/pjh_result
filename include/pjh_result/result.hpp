@@ -1325,6 +1325,7 @@ namespace pjh::result
                      std::same_as<detail::result_error_t<U>, E>
         [[nodiscard]] auto flatten() const & -> Result<detail::result_value_t<U>, E>
         {
+            require_not_moved_();
             if (is_ok())
             {
                 if constexpr (std::is_void_v<detail::result_value_t<U>>)
@@ -1342,6 +1343,7 @@ namespace pjh::result
         [[nodiscard]] auto flatten()
             && -> Result<detail::result_value_t<U>, E>
         {
+            require_not_moved_();
             if (is_ok())
             {
                 auto inner = std::move(ok_);
@@ -1397,6 +1399,7 @@ namespace pjh::result
         [[nodiscard]] auto transpose() const &
             -> Option<Result<typename V::value_type, E>>
         {
+            require_not_moved_();
             using InnerV = typename V::value_type;
             using Out = Option<Result<InnerV, E>>;
 
@@ -1420,6 +1423,7 @@ namespace pjh::result
         [[nodiscard]] auto transpose() &&
             -> Option<Result<typename V::value_type, E>>
         {
+            require_not_moved_();
             using InnerV = typename V::value_type;
             using Out = Option<Result<InnerV, E>>;
 
