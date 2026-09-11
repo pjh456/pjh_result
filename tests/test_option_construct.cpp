@@ -93,3 +93,16 @@ TEST_CASE("contains with string")
     CHECK_FALSE(some.contains(std::string("world")));
     CHECK_FALSE(res::Option<std::string>::None().contains(std::string("x")));
 }
+
+namespace
+{
+    // Task 36: a reference `T` must be rejected at the class constraint level
+    // instead of hard-erroring deep inside the tagged union.
+    template <typename T>
+    concept OptionInstantiable = requires { typename res::Option<T>; };
+}
+
+static_assert(OptionInstantiable<int>);
+static_assert(OptionInstantiable<void>);
+static_assert(!OptionInstantiable<int &>);
+static_assert(!OptionInstantiable<const std::string &>);

@@ -38,9 +38,22 @@ namespace pjh::result::detail
     template <typename T>
     concept NotResult = !ResultType<T>;
 
-    /// @brief Satisfied when `T` and `E` are distinct types (a `Result` forbids `T == E`).
+    /// @brief Satisfied when `T` may be stored in a tagged union: `void` is allowed
+    ///        (the valueless branch is represented by `Unit`), references are not
+    ///        (a union cannot hold a reference member).
+    template <typename T>
+    concept Storable = !std::is_reference_v<T>;
+
+    /// @brief Satisfied when `E` may be the error type of a `Result`: neither `void`
+    ///        (there is no `Result<T, void>`) nor a reference.
+    template <typename E>
+    concept ValidErrorType = Storable<E> && (!std::is_void_v<E>);
+
+    /// @brief Satisfied when `T` and `E` form a valid `Result`: a storable `T`, a
+    ///        non-void non-reference `E`, and `T != E` (a `Result` forbids `T == E`).
     template <typename T, typename E>
     concept ValidResultTypes =
+        Storable<T> && ValidErrorType<E> &&
         !std::same_as<std::remove_cvref_t<T>,
                       std::remove_cvref_t<E>>;
 

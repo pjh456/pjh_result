@@ -19,6 +19,7 @@
 namespace pjh::result
 {
     template <typename T>
+        requires detail::Storable<T>
     class Option;
 
     namespace detail
@@ -54,7 +55,7 @@ namespace pjh::result
      * `T = void` is supported: `Some()` carries no value (a mere presence flag) and
      * `unwrap()` returns `void`.
      *
-     * @tparam T contained value type (may be `void`)
+     * @tparam T contained value type (may be `void`, but not a reference)
      *
      * @pre The move constructor of `T` (when non-void) must be `noexcept` (enforced by
      * the in-class `static_assert`), so assignment can destroy-then-nothrow-move and
@@ -62,13 +63,15 @@ namespace pjh::result
      * @note The return value must not be ignored (`[[nodiscard]]`).
      */
     template <typename T>
+        requires detail::Storable<T>
     class [[nodiscard]] Option
     {
     private:
         /// @brief Grants every `Option<U>` specialization access to the state of other
         ///        instantiations, so cross-value-type `zip` / `zip_with` can read both
         ///        operands.
-        template <typename>
+        template <typename U>
+            requires detail::Storable<U>
         friend class Option;
 
         /// @brief Actual storage type; degrades to `Unit` when `T = void`.

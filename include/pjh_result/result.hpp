@@ -21,6 +21,7 @@
 namespace pjh::result
 {
     template <typename T>
+        requires detail::Storable<T>
     class Option;
 
     /// @brief Placeholder type for the success branch when `T = void`.
@@ -202,7 +203,8 @@ namespace pjh::result
      *      implemented as "destroy the old value, then nothrow move-construct the new
      *      one", guaranteeing the object never enters an invalid state.
      * @note The return value must not be ignored (`[[nodiscard]]`).
-     * @note `T` and `E` must not be the same type.
+     * @note `T` and `E` must not be the same type; `T` (when non-void) and `E` must
+     *       not be references, and `E` must not be `void`.
      */
     template <typename T, typename E>
         requires detail::ValidResultTypes<T, E> &&
