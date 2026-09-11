@@ -1507,12 +1507,7 @@ namespace pjh::result
         {
             require_not_moved_();
             if (is_ok())
-            {
-                if constexpr (std::is_void_v<detail::result_value_t<U>>)
-                    return Result<void, E>::Ok();
-                else
-                    return ok_;
-            }
+                return ok_;
             return Result<detail::result_value_t<U>, E>::Err(err_);
         }
 

@@ -451,6 +451,42 @@ TEST_CASE("flatten rvalue on Err propagates")
     CHECK(flat.unwrap_err() == "e");
 }
 
+// 编译期：flatten() const& 的返回类型对 void/非 void 内层值类型都等于内层 Result
+static_assert(std::is_same_v<
+              decltype(std::declval<const res::Result<
+                           res::Result<void, int>, int> &>()
+                           .flatten()),
+              res::Result<void, int>>);
+static_assert(std::is_same_v<
+              decltype(std::declval<const res::Result<
+                           res::Result<int, std::string>, std::string> &>()
+                           .flatten()),
+              res::Result<int, std::string>>);
+
+TEST_CASE("flatten preserves an inner Err when the inner value type is void")
+{
+    using InnerVoid = res::Result<void, int>;
+    using OuterVoid = res::Result<InnerVoid, int>;
+
+    auto err = OuterVoid::Ok(InnerVoid::Err(5));
+    auto flat = err.flatten();
+    CHECK(flat.is_err());
+    CHECK(flat.unwrap_err() == 5);
+
+    auto inner_ok = OuterVoid::Ok(InnerVoid::Ok());
+    auto flat_ok = inner_ok.flatten();
+    CHECK(flat_ok.is_ok());
+
+    auto err_rv = OuterVoid::Ok(InnerVoid::Err(7));
+    auto flat_rv = std::move(err_rv).flatten();
+    CHECK(flat_rv.is_err());
+    CHECK(flat_rv.unwrap_err() == 7);
+
+    auto ok_rv = OuterVoid::Ok(InnerVoid::Ok());
+    auto flat_ok_rv = std::move(ok_rv).flatten();
+    CHECK(flat_ok_rv.is_ok());
+}
+
 TEST_CASE("flatten throws on moved Result")
 {
     using Nested = res::Result<res::Result<int, std::string>, std::string>;
