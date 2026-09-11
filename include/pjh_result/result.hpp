@@ -79,10 +79,12 @@ namespace pjh::result
         template <typename F, typename T>
         using value_result_t = typename value_result<F, T>::type;
 
-        /// @brief Whether `f` is callable on the success value: requires `f()` when `T = void`, else `f(T)`.
+        /// @brief Whether `f` is callable on the success value passed by the const
+        ///        members (which always bind it as `const T&`): requires `f()` when
+        ///        `T = void`, else `f(const T&)`.
         template <typename F, typename T>
         concept MapCallable = (std::is_void_v<T> && std::invocable<F>) ||
-                              (!std::is_void_v<T> && std::invocable<F, T>);
+                              (!std::is_void_v<T> && std::invocable<F, const T &>);
 
         /// @brief Whether `f` applied to the const success value returns a `Result`.
         template <typename F, typename T>

@@ -26,7 +26,34 @@ namespace
     // Used only to fix the return type in the compile-time assertions below.
     std::string error_from_int(const int &v);
     std::string error_from_void();
+
+    // Task 12: invocable only with an rvalue `int&&`. The const combinators always
+    // bind the success value as `const T&`, so the constraint must reject it.
+    struct RvalueOnly
+    {
+        int operator()(int &&) const;
+    };
+
+    // Accepted: the const combinators bind the success value as `const T&`.
+    struct ConstRefOnly
+    {
+        int operator()(const int &) const;
+    };
 }
+
+/// Whether the const-member combinators accept the callable `F` on `R`'s value.
+template <typename R, typename F>
+concept MapCompat = requires(const R &r, F f) {
+    r.map(f);
+    r.inspect(f);
+    r.is_ok_and(f);
+};
+
+// 编译期：MapCallable 以 `const T&` 判定，rvalue-only 可调用对象应被拒绝
+static_assert(!res::detail::MapCallable<RvalueOnly, int>);
+static_assert(res::detail::MapCallable<ConstRefOnly, int>);
+static_assert(!MapCompat<StrResult, RvalueOnly>);
+static_assert(MapCompat<StrResult, ConstRefOnly>);
 
 // 编译期：右值调用按值返回，左值调用仍返回 const 引用
 static_assert(std::is_same_v<
