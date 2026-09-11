@@ -1338,9 +1338,14 @@ namespace pjh::result
          * @tparam E the error type
          * @param err the error value used when None
          * @return `Result<T, E>`
+         * @note `E` must form a valid `Result<T, E>`: it may not be `void`, a reference,
+         *       a `Result`, or the same type as `T` (such errors are rejected at overload
+         *       resolution instead of hard-erroring inside `Result`).
          */
         template <typename E>
-            requires std::move_constructible<E>
+            requires std::move_constructible<E> &&
+                     detail::ValidResultTypes<T, E> && detail::NotResult<E> &&
+                     (!std::is_void_v<E>) && (!std::is_reference_v<E>)
         [[nodiscard]] Result<T, E> ok_or(E err) const
         {
             if (has_value_)
@@ -1361,10 +1366,15 @@ namespace pjh::result
          * @param f the error producer invoked when None
          * @return `Result<T, E>`
          * @note A callable whose result is `void` is rejected (it would form the illegal
-         *       `Result<T, void>`).
+         *       `Result<T, void>`); the produced error type must likewise not be a
+         *       reference, a `Result`, or the same type as `T`.
          */
         template <typename F>
-            requires std::invocable<F> && (!std::is_void_v<std::invoke_result_t<F>>)
+            requires std::invocable<F> &&
+                     detail::ValidResultTypes<T, std::invoke_result_t<F>> &&
+                     detail::NotResult<std::invoke_result_t<F>> &&
+                     (!std::is_void_v<std::invoke_result_t<F>>) &&
+                     (!std::is_reference_v<std::invoke_result_t<F>>)
         [[nodiscard]] auto ok_or_else(F &&f) const -> Result<T, std::invoke_result_t<F>>
         {
             using E = std::invoke_result_t<F>;

@@ -23,7 +23,31 @@ namespace
             return "missing";
         }
     };
+
+    // Task 30: an error type equal to the success type cannot form `Result<T, E>`.
+    struct IntProducer
+    {
+        int operator()() const { return 0; }
+    };
+
+    // Task 30: a reference error type cannot be stored in a `Result` union member.
+    struct RefProducer
+    {
+        std::string &operator()() const;
+    };
+
+    // Task 30: `NotResult` forbids a `Result` from being used as another `Result`'s error.
+    struct ResultProducer
+    {
+        res::Result<int, std::string> operator()() const;
+    };
 }
+
+/// Whether `ok_or` accepts an error value of type `E`.
+template <typename O, typename E>
+concept OkOrCompat = requires(const O &o, E e) {
+    o.ok_or(e);
+};
 
 /// Whether `ok_or_else` accepts the nullary callable `F`.
 template <typename O, typename F>
@@ -34,6 +58,17 @@ concept OkOrElseCompat = requires(const O &o, F f) {
 // 编译期：ok_or_else 接受返回非 void 的 F，干净拒绝返回 void 的 F。
 static_assert(OkOrElseCompat<res::Option<int>, StringProducer>);
 static_assert(!OkOrElseCompat<res::Option<int>, VoidProducer>);
+
+// 编译期：ok_or 的结果错误类型必须能构成合法的 Result<T, E>：E == T 与 Result 错误
+// 类型在重载决议期被剔除，而不是在 Result 体内硬错。
+static_assert(OkOrCompat<res::Option<int>, std::string>);
+static_assert(!OkOrCompat<res::Option<int>, int>);
+static_assert(!OkOrCompat<res::Option<int>, res::Result<int, std::string>>);
+
+// 编译期：ok_or_else 同理拒绝 E == T、引用错误与 Result 错误。
+static_assert(!OkOrElseCompat<res::Option<int>, IntProducer>);
+static_assert(!OkOrElseCompat<res::Option<int>, RefProducer>);
+static_assert(!OkOrElseCompat<res::Option<int>, ResultProducer>);
 
 TEST_CASE("ok_or converts Some to Ok, None to Err")
 {
