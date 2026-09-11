@@ -1353,9 +1353,13 @@ namespace pjh::result
          * @tparam F callable returning a `Result`
          * @param f the follow-up operation
          * @return the return type of `f` (a `Result`)
+         * @note The Err echo branch rebuilds the returned error from the receiver's `E`;
+         *       the overload is rejected when that construction is not possible.
          */
         template <typename F>
-            requires detail::CrefResultFn<F, T>
+            requires detail::CrefResultFn<F, T> &&
+                     std::constructible_from<
+                         detail::result_error_t<detail::cref_result_t<F, T>>, const E &>
         auto and_then(F &&f) const & -> detail::cref_result_t<F, T>
         {
             require_not_moved_();
@@ -1379,7 +1383,9 @@ namespace pjh::result
          * @return the return type of `f` (a `Result`)
          */
         template <typename F>
-            requires detail::ValueResultFn<F, T>
+            requires detail::ValueResultFn<F, T> &&
+                     std::constructible_from<
+                         detail::result_error_t<detail::value_result_t<F, T>>, E &&>
         auto and_then(F &&f) && -> detail::value_result_t<F, T>
         {
             require_not_moved_();
@@ -1404,9 +1410,17 @@ namespace pjh::result
          * @tparam F callable taking `E` and returning a `Result`
          * @param f the recovery operation
          * @return the return type of `f` (a `Result`)
+         * @note The Ok echo branch rebuilds the returned value from the receiver's `T`
+         *       (or the nullary `Ok()` when `T = void`); the overload is rejected when
+         *       that construction is not possible.
          */
         template <typename F>
-            requires detail::ResultType<std::invoke_result_t<F, const E &>>
+            requires detail::ResultType<std::invoke_result_t<F, const E &>> &&
+                     ((std::is_void_v<T> &&
+                       std::is_void_v<detail::result_value_t<std::invoke_result_t<F, const E &>>>) ||
+                      (!std::is_void_v<T> &&
+                       std::constructible_from<
+                           detail::result_value_t<std::invoke_result_t<F, const E &>>, const T &>))
         auto or_else(F &&f) const & -> std::invoke_result_t<F, const E &>
         {
             require_not_moved_();
@@ -1427,7 +1441,12 @@ namespace pjh::result
          * @return the return type of `f` (a `Result`)
          */
         template <typename F>
-            requires detail::ResultType<std::invoke_result_t<F, E>>
+            requires detail::ResultType<std::invoke_result_t<F, E>> &&
+                     ((std::is_void_v<T> &&
+                       std::is_void_v<detail::result_value_t<std::invoke_result_t<F, E>>>) ||
+                      (!std::is_void_v<T> &&
+                       std::constructible_from<
+                           detail::result_value_t<std::invoke_result_t<F, E>>, T &&>))
         auto or_else(F &&f) && -> std::invoke_result_t<F, E>
         {
             require_not_moved_();

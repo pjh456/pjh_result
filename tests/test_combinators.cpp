@@ -83,6 +83,54 @@ namespace
         void operator()(const std::string &) const {}
     };
 
+    // Task 29: `and_then`'s short-circuit echo branch rebuilds the returned Result's
+    // error from the receiver's `const E&`. This error type cannot be built from
+    // `const std::string&`, so the overload must be cleanly rejected.
+    struct StringIncompatibleError
+    {
+        int value;
+    };
+
+    struct AndThenBadEchoErr
+    {
+        res::Result<long, StringIncompatibleError> operator()(int) const;
+    };
+
+    // Task 29: `or_else`'s Ok echo branch rebuilds the returned Result's value from
+    // the receiver's `const T&`. This value type cannot be built from `const int&`.
+    struct IntIncompatibleValue
+    {
+        std::string text;
+    };
+
+    struct OrElseBadEchoValue
+    {
+        res::Result<IntIncompatibleValue, std::string> operator()(const std::string &) const;
+    };
+
+    // Task 29: with `T = void` the Ok echo uses the nullary `Ret::Ok()`, so a returned
+    // Result with a non-void value type cannot be echoed.
+    struct OrElseValuedFromVoid
+    {
+        res::Result<int, std::string> operator()(const std::string &) const;
+    };
+
+    // Positive controls for the Task 29 echo constraints.
+    struct AndThenGoodEcho
+    {
+        res::Result<long, std::string> operator()(const int &) const;
+    };
+
+    struct OrElseGoodEcho
+    {
+        res::Result<int, std::string> operator()(const std::string &) const;
+    };
+
+    struct VoidOrElseGoodEcho
+    {
+        res::Result<void, std::string> operator()(const std::string &) const;
+    };
+
     // Task 21: returns a Result and is invocable only with an rvalue `int&&`. The
     // const& overload of and_then must reject it cleanly (SFINAE via the
     // cref_result_t fallback) instead of hard-erroring, while the && overload
@@ -114,6 +162,18 @@ concept ConstAndThenCompat = requires(const R &r, F f) {
 template <typename R, typename F>
 concept RvalueAndThenCompat = requires(R &&r, F f) {
     { std::move(r).and_then(f) };
+};
+
+/// Whether `or_else` on a const lvalue accepts `F`.
+template <typename R, typename F>
+concept ConstOrElseCompat = requires(const R &r, F f) {
+    { r.or_else(f) };
+};
+
+/// Whether `or_else` on an rvalue accepts `F`.
+template <typename R, typename F>
+concept RvalueOrElseCompat = requires(R &&r, F f) {
+    { std::move(r).or_else(f) };
 };
 
 /// Whether the const error observers accept the callable `F` (the `const E&` path).
@@ -148,6 +208,24 @@ static_assert(std::is_same_v<res::detail::cref_result_t<RvalueOnlyResultFn, int>
 static_assert(std::is_same_v<res::detail::value_result_t<ErrorToLong, int>, void>);
 static_assert(!ConstAndThenCompat<StrResult, RvalueOnlyResultFn>);
 static_assert(RvalueAndThenCompat<StrResult, RvalueOnlyResultFn>);
+
+// 编译期：and_then 的回传分支需要用接收者的错误重建 Ret 的 Err；无法构造时
+// 两个重载都要干净拒绝（const& 用 const E&，&& 用 E&&），而非函数体硬错。
+static_assert(ConstAndThenCompat<StrResult, AndThenGoodEcho>);
+static_assert(RvalueAndThenCompat<StrResult, AndThenGoodEcho>);
+static_assert(!ConstAndThenCompat<StrResult, AndThenBadEchoErr>);
+static_assert(!RvalueAndThenCompat<StrResult, AndThenBadEchoErr>);
+
+// 编译期：or_else 的 Ok 回传分支需要按值类别重建 Ret 的 Ok；无法构造时两个重载
+// 都干净拒绝（const& 用 const T&，&& 用 T&&），T=void 时要求 nullary Ret::Ok()。
+static_assert(ConstOrElseCompat<StrResult, OrElseGoodEcho>);
+static_assert(RvalueOrElseCompat<StrResult, OrElseGoodEcho>);
+static_assert(ConstOrElseCompat<res::Result<void, std::string>, VoidOrElseGoodEcho>);
+static_assert(RvalueOrElseCompat<res::Result<void, std::string>, VoidOrElseGoodEcho>);
+static_assert(!ConstOrElseCompat<StrResult, OrElseBadEchoValue>);
+static_assert(!RvalueOrElseCompat<StrResult, OrElseBadEchoValue>);
+static_assert(!ConstOrElseCompat<res::Result<void, std::string>, OrElseValuedFromVoid>);
+static_assert(!RvalueOrElseCompat<res::Result<void, std::string>, OrElseValuedFromVoid>);
 
 // 编译期：map_result_t 以 `const T&` 推导返回类型，与 const 成员的实际调用形式一致
 static_assert(std::is_same_v<res::detail::map_result_t<OverloadedMap, int>, long>);
