@@ -7,6 +7,7 @@
 
 #include <type_traits>
 #include <concepts>
+#include <utility>
 
 namespace pjh::result::detail
 {
@@ -56,13 +57,28 @@ namespace pjh::result::detail
         typename option_traits<std::remove_cvref_t<X>>::value_type;
     };
 
-    /// @brief Satisfied when `X` exposes `first_type` / `second_type` (a pair-like type).
-    ///        Reference element types are not supported (an `Option` cannot store a reference).
+    /// @brief Satisfied when `X` (ignoring cv/ref) is a `std::pair<A, B>` specialization.
     template <typename X>
-    concept PairType = requires {
-        typename std::remove_cvref_t<X>::first_type;
-        typename std::remove_cvref_t<X>::second_type;
+    struct is_std_pair : std::false_type
+    {
     };
+    template <typename A, typename B>
+    struct is_std_pair<std::pair<A, B>> : std::true_type
+    {
+    };
+
+    /// @brief Satisfied when `X` is a `std::pair<A, B>` with non-reference element types.
+    ///        A bare pair-like type that merely exposes `first_type` / `second_type`, and
+    ///        a `std::pair<A &, B &>` (which an `Option` cannot store), are rejected.
+    template <typename X>
+    concept PairType =
+        requires {
+            typename std::remove_cvref_t<X>::first_type;
+            typename std::remove_cvref_t<X>::second_type;
+        } &&
+        is_std_pair<std::remove_cvref_t<X>>::value &&
+        (!std::is_reference_v<typename std::remove_cvref_t<X>::first_type>) &&
+        (!std::is_reference_v<typename std::remove_cvref_t<X>::second_type>);
 }
 
 #endif // INCLUDE_PJH_RESULT_DETAIL_TRAITS_HPP

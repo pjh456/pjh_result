@@ -570,10 +570,10 @@ namespace pjh::result
          * @brief Splits `Some((a, b))` into `(Some(a), Some(b))`; `None` becomes
          *        `(None, None)`. Inverse of `zip`.
          *
-         * Available only when the value type exposes `first_type` / `second_type`
-         * (e.g. `std::pair`); reference element types are not supported.
+         * Available only when the value type is a `std::pair<A, B>` with non-reference
+         * elements; bare pair-like types and reference-element pairs are rejected.
          *
-         * @tparam U pair-like value type (deduced from `T`)
+         * @tparam U `std::pair<A, B>` value type (deduced from `T`)
          * @return `std::pair<Option<A>, Option<B>>` for a value type `std::pair<A, B>`
          */
         template <typename U = T>

@@ -52,6 +52,16 @@ namespace
         int operator()(int, int) const;
     };
 
+    // Task 35: exposes first_type / second_type and .first / .second members but is not
+    // a std::pair, so PairType must reject it instead of letting unzip hard-error.
+    struct PairLike
+    {
+        using first_type = int;
+        using second_type = int;
+        int first;
+        int second;
+    };
+
     template <typename T, typename U, typename F>
     concept LvalueZipWith = requires(const T &a, const U &b, F f)
     {
@@ -569,6 +579,17 @@ static_assert(std::is_same_v<
 static_assert(HasUnzip<res::Option<std::pair<int, int>>>);
 static_assert(!HasUnzip<res::Option<void>>);
 static_assert(!HasUnzip<res::Option<int>>);
+
+// 编译期：PairType 仅识别真正的 std::pair（元素非引用）；引用元素 pair 与非 pair
+// 的 pair-like（仅有 first_type/second_type 或非 std::pair）在约束层被拒绝。
+static_assert(res::detail::PairType<std::pair<int, std::string>>);
+static_assert(res::detail::PairType<std::pair<const int, std::string>>);
+static_assert(!res::detail::PairType<std::pair<int &, int &>>);
+static_assert(!res::detail::PairType<std::pair<int &, int>>);
+static_assert(!res::detail::PairType<PairLike>);
+static_assert(!res::detail::PairType<int>);
+static_assert(!res::detail::PairType<void>);
+static_assert(!HasUnzip<res::Option<PairLike>>);
 
 TEST_CASE("unzip splits Some(pair) into a pair of Options")
 {
