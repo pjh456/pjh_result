@@ -6,6 +6,7 @@
 #define INCLUDE_PJH_RESULT_OPTION_HPP
 
 #include <concepts>
+#include <functional>
 #include <memory>
 #include <string>
 #include <type_traits>
@@ -247,6 +248,45 @@ namespace pjh::result
             requires(!std::is_void_v<T>) && std::equality_comparable<StoredT>
         {
             return has_value_ && value_ == val;
+        }
+
+        /**
+         * @brief Returns a borrowing view of the contained value (`Some`) or `None`.
+         *
+         * The view holds a `std::reference_wrapper` pointing into `*this`; it neither
+         * moves nor copies the value and leaves the source unchanged. Available only
+         * when `T` is non-void.
+         *
+         * @return `Option<std::reference_wrapper<const T>>`
+         * @warning The returned view borrows `*this`. It must not outlive the source
+         *          and must not be used after the source is destroyed or reassigned.
+         */
+        template <typename U = T>
+            requires(!std::is_void_v<U>)
+        [[nodiscard]] auto as_ref() const &
+            -> Option<std::reference_wrapper<const U>>
+        {
+            using R = Option<std::reference_wrapper<const U>>;
+            return has_value_ ? R::Some(std::cref(value_)) : R::None();
+        }
+
+        /**
+         * @brief Returns a mutable borrowing view of the contained value or `None`.
+         *
+         * Writes made through the returned view are visible on `*this`. Callable only
+         * on a non-const lvalue; available only when `T` is non-void.
+         *
+         * @return `Option<std::reference_wrapper<T>>`
+         * @warning The returned view borrows `*this`. It must not outlive the source
+         *          and must not be used after the source is destroyed or reassigned.
+         */
+        template <typename U = T>
+            requires(!std::is_void_v<U>)
+        [[nodiscard]] auto as_mut() &
+            -> Option<std::reference_wrapper<U>>
+        {
+            using R = Option<std::reference_wrapper<U>>;
+            return has_value_ ? R::Some(std::ref(value_)) : R::None();
         }
 
         /**

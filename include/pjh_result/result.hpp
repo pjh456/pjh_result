@@ -406,6 +406,89 @@ namespace pjh::result
             return is_err() && err_ == val;
         }
 
+        /**
+         * @brief Returns a borrowing view of the active branch (Ok value or Err error).
+         *
+         * The view holds a `std::reference_wrapper` into `*this`, so the value or error
+         * is neither copied nor moved and the source is left unchanged. Available only
+         * when `T` is non-void.
+         *
+         * @return `Result<std::reference_wrapper<const T>, std::reference_wrapper<const E>>`
+         * @throws bad_result_access when the result is in the Moved state
+         * @warning The returned view borrows `*this`. It must not outlive the source
+         *          and must not be used after the source is destroyed or reassigned.
+         */
+        template <typename U = T>
+            requires(!std::is_void_v<U>)
+        [[nodiscard]] auto as_ref() const &
+            -> Result<std::reference_wrapper<const U>, std::reference_wrapper<const E>>
+        {
+            using R =
+                Result<std::reference_wrapper<const U>, std::reference_wrapper<const E>>;
+            require_not_moved_();
+            return is_ok() ? R::Ok(std::cref(ok_)) : R::Err(std::cref(err_));
+        }
+
+        /**
+         * @brief Returns a mutable borrowing view of the active branch.
+         *
+         * Writes made through the returned view are visible on `*this`. Callable only
+         * on a non-const lvalue; available only when `T` is non-void.
+         *
+         * @return `Result<std::reference_wrapper<T>, std::reference_wrapper<E>>`
+         * @throws bad_result_access when the result is in the Moved state
+         * @warning The returned view borrows `*this`. It must not outlive the source
+         *          and must not be used after the source is destroyed or reassigned.
+         */
+        template <typename U = T>
+            requires(!std::is_void_v<U>)
+        [[nodiscard]] auto as_mut() &
+            -> Result<std::reference_wrapper<U>, std::reference_wrapper<E>>
+        {
+            using R = Result<std::reference_wrapper<U>, std::reference_wrapper<E>>;
+            require_not_moved_();
+            return is_ok() ? R::Ok(std::ref(ok_)) : R::Err(std::ref(err_));
+        }
+
+        /**
+         * @brief Returns a borrowing view of the error branch when `T = void`.
+         *
+         * With no success value to borrow, only the error is wrapped.
+         *
+         * @return `Result<void, std::reference_wrapper<const E>>`
+         * @throws bad_result_access when the result is in the Moved state
+         * @warning The returned view borrows `*this`. It must not outlive the source
+         *          and must not be used after the source is destroyed or reassigned.
+         */
+        [[nodiscard]] auto as_ref() const &
+            -> Result<void, std::reference_wrapper<const E>>
+            requires std::is_void_v<T>
+        {
+            using R = Result<void, std::reference_wrapper<const E>>;
+            require_not_moved_();
+            return is_ok() ? R::Ok() : R::Err(std::cref(err_));
+        }
+
+        /**
+         * @brief Returns a mutable borrowing view of the error branch when `T = void`.
+         *
+         * Writes made through the returned view are visible on `*this`. Callable only
+         * on a non-const lvalue.
+         *
+         * @return `Result<void, std::reference_wrapper<E>>`
+         * @throws bad_result_access when the result is in the Moved state
+         * @warning The returned view borrows `*this`. It must not outlive the source
+         *          and must not be used after the source is destroyed or reassigned.
+         */
+        [[nodiscard]] auto as_mut() &
+            -> Result<void, std::reference_wrapper<E>>
+            requires std::is_void_v<T>
+        {
+            using R = Result<void, std::reference_wrapper<E>>;
+            require_not_moved_();
+            return is_ok() ? R::Ok() : R::Err(std::ref(err_));
+        }
+
     public:
         /**
          * @brief Unwraps the success value; throws if Err. Available only when `T` is non-void.
