@@ -66,3 +66,39 @@ TEST_CASE("no leak through rvalue unwrap")
     }
     CHECK(InstanceCounter::live == 0);
 }
+
+TEST_CASE("no leak through rvalue flatten of Some(Some)")
+{
+    InstanceCounter::reset();
+    {
+        auto outer = res::Option<res::Option<InstanceCounter>>::Some(
+            res::Option<InstanceCounter>::Some(InstanceCounter{21}));
+        auto flat = std::move(outer).flatten();
+        CHECK(flat.is_some());
+        CHECK(flat.unwrap().id == 21);
+    }
+    CHECK(InstanceCounter::live == 0);
+}
+
+TEST_CASE("no leak through rvalue flatten of Some(None)")
+{
+    InstanceCounter::reset();
+    {
+        auto outer = res::Option<res::Option<InstanceCounter>>::Some(
+            res::Option<InstanceCounter>::None());
+        auto flat = std::move(outer).flatten();
+        CHECK(flat.is_none());
+    }
+    CHECK(InstanceCounter::live == 0);
+}
+
+TEST_CASE("no leak through rvalue flatten of None")
+{
+    InstanceCounter::reset();
+    {
+        auto outer = res::Option<res::Option<InstanceCounter>>::None();
+        auto flat = std::move(outer).flatten();
+        CHECK(flat.is_none());
+    }
+    CHECK(InstanceCounter::live == 0);
+}

@@ -1076,6 +1076,7 @@ namespace pjh::result
             if (!has_value_)
                 return Option<typename U::value_type>::None();
             auto inner = std::move(value_);
+            destroy_();
             has_value_ = false;
             return inner;
         }
