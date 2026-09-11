@@ -55,6 +55,27 @@ namespace
         long operator()(const std::string &) const;
     };
 
+    // Task 27: invocable only with an rvalue `std::string&&`. The const error-side
+    // combinators bind the error as `const E&`, so the constraint must reject it.
+    struct RvalueErrOnly
+    {
+        long operator()(std::string &&) const;
+    };
+
+    // Task 27: overloaded on the error's value category with distinct return types.
+    // The declared result type must resolve to the `const std::string&` overload.
+    struct OverloadedMapErr
+    {
+        long operator()(std::string &&) const
+        {
+            return 0;
+        }
+        unsigned operator()(const std::string &e) const
+        {
+            return static_cast<unsigned>(e.size());
+        }
+    };
+
     // Task 21: returns a Result and is invocable only with an rvalue `int&&`. The
     // const& overload of and_then must reject it cleanly (SFINAE via the
     // cref_result_t fallback) instead of hard-erroring, while the && overload
@@ -88,6 +109,19 @@ concept RvalueAndThenCompat = requires(R &&r, F f) {
     { std::move(r).and_then(f) };
 };
 
+/// Whether the const error observers accept the callable `F` (the `const E&` path).
+template <typename R, typename F>
+concept ErrCompat = requires(const R &r, F f) {
+    r.is_err_and(f);
+    r.map_err(f);
+};
+
+/// Whether `map_or_else` on a const lvalue accepts the error callable `D`.
+template <typename R, typename D>
+concept MapOrElseCompat = requires(const R &r, D d) {
+    r.map_or_else(d, OverloadedMap{});
+};
+
 // 编译期：MapCallable 以 `const T&` 判定，rvalue-only 可调用对象应被拒绝
 static_assert(!res::detail::MapCallable<RvalueOnly, int>);
 static_assert(res::detail::MapCallable<ConstRefOnly, int>);
@@ -117,6 +151,25 @@ static_assert(std::is_same_v<
               decltype(std::declval<const StrResult &>().map_or_else(
                   std::declval<ErrorToLong>(), std::declval<OverloadedMap>())),
               long>);
+
+// 编译期：错误侧 const 组合子以 `const E&` 判定，rvalue-only 可调用对象应被拒绝
+static_assert(ErrCompat<StrResult, ErrorToLong>);
+static_assert(!ErrCompat<StrResult, RvalueErrOnly>);
+static_assert(MapOrElseCompat<StrResult, ErrorToLong>);
+static_assert(!MapOrElseCompat<StrResult, RvalueErrOnly>);
+
+// 编译期：map_err 返回类型以 `const E&` 推导，与 const 成员的实际调用形式一致；
+// 不可调用 F 时 map_err_result_t 退化为 void（Clang 返回类型替换不硬错）。
+static_assert(std::is_same_v<
+              res::detail::map_err_result_t<OverloadedMapErr, std::string>,
+              unsigned>);
+static_assert(std::is_same_v<
+              res::detail::map_err_result_t<RvalueErrOnly, std::string>,
+              void>);
+static_assert(std::is_same_v<
+              decltype(std::declval<const StrResult &>().map_err(
+                  std::declval<ErrorToLong>())),
+              res::Result<int, long>>);
 
 // 编译期：右值调用按值返回，左值调用仍返回 const 引用
 static_assert(std::is_same_v<
@@ -181,6 +234,20 @@ TEST_CASE("map_err passes through Ok untouched")
                           { return s.size(); });
     CHECK(r.is_ok());
     CHECK(r.unwrap() == 5);
+}
+
+TEST_CASE("map_err accepts a callable taking the error as const E&")
+{
+    auto r = StrResult::Err(std::string("boom")).map_err(
+        [](const std::string &e)
+        { return e.size(); });
+    CHECK(r.is_err());
+    CHECK(r.unwrap_err() == std::size_t{4});
+
+    // 值类别重载：const 成员按 `const E&` 调用，须选中 const 重载（unsigned）
+    auto ov = StrResult::Err(std::string("abcd")).map_err(OverloadedMapErr{});
+    CHECK(ov.is_err());
+    CHECK(ov.unwrap_err() == 4u);
 }
 
 TEST_CASE("and_then chains on Ok")

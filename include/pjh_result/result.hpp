@@ -125,6 +125,22 @@ namespace pjh::result
         template <typename F, typename T>
         using value_result_t = typename value_result<F, T>::type;
 
+        /// @brief Result type of `map_err`: `f(const E&)`. When `F` is not invocable
+        ///        the trait degrades to `void` instead of hard-erroring, so the alias
+        ///        stays usable in return types while the constraint rejects `F`.
+        template <typename F, typename E, bool = std::invocable<F, const E &>>
+        struct map_err_result
+        {
+            using type = std::invoke_result_t<F, const E &>;
+        };
+        template <typename F, typename E>
+        struct map_err_result<F, E, false>
+        {
+            using type = void;
+        };
+        template <typename F, typename E>
+        using map_err_result_t = typename map_err_result<F, E>::type;
+
         /// @brief Whether `f` is callable on the success value passed by the const
         ///        members (which always bind it as `const T&`): requires `f()` when
         ///        `T = void`, else `f(const T&)`.
@@ -531,13 +547,13 @@ namespace pjh::result
         /**
          * @brief Whether the result is Err and the error value satisfies @p f.
          *
-         * @tparam F predicate on the error value
+         * @tparam F predicate on the error value (bound as `const E&`)
          * @param f the predicate
          * @return `is_err() && bool(f(error))`
          * @throws bad_result_access when the result is in the Moved state
          */
         template <typename F>
-            requires std::invocable<F, E>
+            requires std::invocable<F, const E &>
         [[nodiscard]] bool is_err_and(F &&f) const
         {
             require_not_moved_();
@@ -1039,18 +1055,18 @@ namespace pjh::result
          * On Err(e), returns `Err(f(e))`; on Ok, returns `Ok` unchanged (`Ok()` when `T = void`).
          *
          * @tparam F the transform callable
-         * @param f callable taking `E` and returning `G`
+         * @param f callable taking the error as `const E&` and returning `G`
          * @return `Result<T, G>`
          */
         template <typename F>
-            requires std::invocable<F, E>
+            requires std::invocable<F, const E &>
         [[nodiscard]] auto map_err(F &&f) const
-            -> Result<T, std::invoke_result_t<F, E>>
-            requires detail::ValidResultTypes<T, std::invoke_result_t<F, E>> &&
-                     (!std::is_same_v<std::invoke_result_t<F, E>, T>)
+            -> Result<T, detail::map_err_result_t<F, E>>
+            requires detail::ValidResultTypes<T, detail::map_err_result_t<F, E>> &&
+                     (!std::is_same_v<detail::map_err_result_t<F, E>, T>)
         {
             require_not_moved_();
-            using E2 = std::invoke_result_t<F, E>;
+            using E2 = detail::map_err_result_t<F, E>;
 
             if (is_err())
                 return Result<T, E2>::Err(std::invoke(f, err_));
@@ -1095,16 +1111,17 @@ namespace pjh::result
          *
          * Collapses to a plain value `U`. When `T = void`, `f()` is called.
          *
-         * @tparam D callable producing `U` from the error
+         * @tparam D callable producing `U` from the error (bound as `const E&`)
          * @tparam F callable producing `U` from the success value (or nullary when `T = void`)
          * @param d fallback applied to the error
          * @param f transform applied to the success value
          * @return `f(...)` if Ok, otherwise `d(error)`
          */
         template <typename D, typename F>
-            requires detail::MapCallable<F, T> && std::invocable<D, E> &&
+            requires detail::MapCallable<F, T> && std::invocable<D, const E &> &&
                      (!std::is_void_v<detail::map_result_t<F, T>>) &&
-                     std::convertible_to<std::invoke_result_t<D, E>, detail::map_result_t<F, T>>
+                     std::convertible_to<detail::map_err_result_t<D, E>,
+                                         detail::map_result_t<F, T>>
         [[nodiscard]] detail::map_result_t<F, T> map_or_else(D &&d, F &&f) const
         {
             require_not_moved_();
