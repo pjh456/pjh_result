@@ -2,10 +2,34 @@
 
 #include <memory>
 #include <string>
+#include <type_traits>
+#include <utility>
 
 #include "pjh_result/option.hpp"
 
 namespace res = pjh::result;
+
+using IntOpt = res::Option<int>;
+
+namespace
+{
+    void observe_int(int) {}
+
+    IntOpt make_some(int v)
+    {
+        return IntOpt::Some(v);
+    }
+}
+
+// 编译期：右值调用按值返回，左值调用仍返回 const 引用
+static_assert(std::is_same_v<
+              decltype(std::declval<IntOpt>().inspect(&observe_int)),
+              IntOpt>);
+static_assert(!std::is_reference_v<
+              decltype(std::declval<IntOpt>().inspect(&observe_int))>);
+static_assert(std::is_same_v<
+              decltype(std::declval<IntOpt &>().inspect(&observe_int)),
+              const IntOpt &>);
 
 TEST_CASE("map transforms Some, passes None through")
 {
@@ -61,7 +85,8 @@ TEST_CASE("inspect observes Some and returns self")
     CHECK(&same == &o);
 
     seen = 0;
-    res::Option<int>::None().inspect(
+    auto none = res::Option<int>::None();
+    none.inspect(
         [&](int v)
         { seen = v; });
     CHECK(seen == 0);
@@ -243,4 +268,57 @@ TEST_CASE("zip_with rvalue moves values into combiner")
         { return x + " " + y; });
     CHECK(z.is_some());
     CHECK(z.unwrap() == "hello world");
+}
+
+TEST_CASE("inspect rvalue observes only Some and returns by value")
+{
+    int calls = 0;
+
+    auto some = IntOpt::Some(7);
+    auto moved_some = std::move(some).inspect(
+        [&](int v)
+        {
+            ++calls;
+            CHECK(v == 7);
+        });
+    CHECK(calls == 1);
+    CHECK(moved_some.is_some());
+    CHECK(moved_some.unwrap() == 7);
+    CHECK(some.is_some()); // source not reset
+
+    auto none = IntOpt::None();
+    auto moved_none = std::move(none).inspect(
+        [&](int v)
+        {
+            ++calls;
+            (void)v;
+        });
+    CHECK(calls == 1); // not invoked on None
+    CHECK(moved_none.is_none());
+}
+
+TEST_CASE("inspect rvalue chains from a temporary Option")
+{
+    int seen = 0;
+    auto o = make_some(4)
+                 .inspect(
+                     [&](int v)
+                     {
+                         ++seen;
+                         CHECK(v == 4);
+                     })
+                 .map(
+                     [](int v)
+                     { return v * 10; });
+    CHECK(seen == 1);
+    CHECK(o.is_some());
+    CHECK(o.unwrap() == 40);
+}
+
+TEST_CASE("lvalue inspect keeps returning a reference to self")
+{
+    auto o = IntOpt::Some(1);
+    const auto &same = o.inspect(&observe_int);
+    CHECK(&same == &o);
+    CHECK(o.is_some());
 }

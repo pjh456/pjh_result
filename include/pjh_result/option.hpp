@@ -781,6 +781,31 @@ namespace pjh::result
             return *this;
         }
 
+        /**
+         * @brief Invokes @p f on the value if Some, then returns `*this` by value.
+         *
+         * The rvalue counterpart of the `const &` overload: the observer runs before
+         * the object is moved out, so the result stays valid when chained from a
+         * temporary. When `T = void`, `f()` is called.
+         *
+         * @tparam F callable observing the value (or nullary when `T = void`)
+         * @param f the observer
+         * @return `*this` moved into a new `Option`
+         */
+        template <typename F>
+            requires detail::MapCallable<F, T>
+        [[nodiscard]] Option inspect(F &&f) &&
+        {
+            if (has_value_)
+            {
+                if constexpr (std::is_void_v<T>)
+                    std::invoke(f);
+                else
+                    std::invoke(f, value_);
+            }
+            return std::move(*this);
+        }
+
     public:
         /**
          * @brief Chains an option-returning operation (FlatMap / AndThen).

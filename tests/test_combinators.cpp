@@ -2,11 +2,44 @@
 
 #include <cstddef>
 #include <string>
+#include <type_traits>
+#include <utility>
 
 #include "pjh_result/result.hpp"
 
 namespace res = pjh::result;
 using bad_access = pjh::result::bad_result_access;
+
+using StrResult = res::Result<int, std::string>;
+
+namespace
+{
+    void observe_ok(int) {}
+    void observe_err(const std::string &) {}
+
+    StrResult make_ok(int v)
+    {
+        return StrResult::Ok(v);
+    }
+}
+
+// 编译期：右值调用按值返回，左值调用仍返回 const 引用
+static_assert(std::is_same_v<
+              decltype(std::declval<StrResult>().inspect(&observe_ok)),
+              StrResult>);
+static_assert(!std::is_reference_v<
+              decltype(std::declval<StrResult>().inspect(&observe_ok))>);
+static_assert(std::is_same_v<
+              decltype(std::declval<StrResult>().inspect_err(&observe_err)),
+              StrResult>);
+static_assert(!std::is_reference_v<
+              decltype(std::declval<StrResult>().inspect_err(&observe_err))>);
+static_assert(std::is_same_v<
+              decltype(std::declval<StrResult &>().inspect(&observe_ok)),
+              const StrResult &>);
+static_assert(std::is_same_v<
+              decltype(std::declval<StrResult &>().inspect_err(&observe_err)),
+              const StrResult &>);
 
 TEST_CASE("map transforms the Ok value")
 {
@@ -292,4 +325,88 @@ TEST_CASE("flatten rvalue on Err propagates")
     auto flat = std::move(outer).flatten();
     CHECK(flat.is_err());
     CHECK(flat.unwrap_err() == "e");
+}
+
+TEST_CASE("inspect rvalue observes only the active branch and returns by value")
+{
+    int ok_calls = 0;
+    int err_calls = 0;
+
+    auto ok = StrResult::Ok(7);
+    auto moved_ok = std::move(ok).inspect(
+        [&](int v)
+        {
+            ++ok_calls;
+            CHECK(v == 7);
+        });
+    CHECK(ok_calls == 1);
+    CHECK(moved_ok.is_ok());
+    CHECK(moved_ok.unwrap() == 7);
+    CHECK(ok.is_ok()); // source not marked moved
+
+    auto er = StrResult::Err(std::string("e"));
+    auto moved_err = std::move(er).inspect(
+        [&](int v)
+        {
+            ++err_calls;
+            (void)v;
+        });
+    CHECK(err_calls == 0); // not invoked on Err
+    CHECK(ok_calls == 1);
+    CHECK(moved_err.is_err());
+    CHECK(er.is_err()); // source not marked moved
+}
+
+TEST_CASE("inspect_err rvalue observes only the error branch and returns by value")
+{
+    int calls = 0;
+
+    auto er = StrResult::Err(std::string("boom"));
+    auto moved_err = std::move(er).inspect_err(
+        [&](const std::string &e)
+        {
+            ++calls;
+            CHECK(e == "boom");
+        });
+    CHECK(calls == 1);
+    CHECK(moved_err.is_err());
+    CHECK(moved_err.unwrap_err() == "boom");
+    CHECK(er.is_err()); // source not marked moved
+
+    auto ok = StrResult::Ok(3);
+    auto moved_ok = std::move(ok).inspect_err(
+        [&](const std::string &e)
+        {
+            ++calls;
+            (void)e;
+        });
+    CHECK(calls == 1); // not invoked on Ok
+    CHECK(moved_ok.is_ok());
+    CHECK(ok.is_ok());
+}
+
+TEST_CASE("inspect rvalue chains from a temporary Result")
+{
+    int seen = 0;
+    auto r = make_ok(4)
+                 .inspect(
+                     [&](int v)
+                     {
+                         ++seen;
+                         CHECK(v == 4);
+                     })
+                 .map(
+                     [](int v)
+                     { return v * 10; });
+    CHECK(seen == 1);
+    CHECK(r.is_ok());
+    CHECK(r.unwrap() == 40);
+}
+
+TEST_CASE("lvalue inspect keeps returning a reference to self")
+{
+    auto r = StrResult::Ok(1);
+    const auto &same = r.inspect(&observe_ok);
+    CHECK(&same == &r);
+    CHECK(r.is_ok());
 }

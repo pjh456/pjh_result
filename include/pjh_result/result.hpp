@@ -935,6 +935,31 @@ namespace pjh::result
         }
 
         /**
+         * @brief Invokes @p f on the success value if Ok, then returns `*this` by value.
+         *
+         * The rvalue counterpart of the `const &` overload: the observer runs before
+         * the object is moved out, so the result stays valid when chained from a
+         * temporary. When `T = void`, `f()` is called.
+         *
+         * @tparam F callable observing the success value (or nullary when `T = void`)
+         * @param f the observer
+         * @return `*this` moved into a new `Result`
+         */
+        template <typename F>
+            requires detail::MapCallable<F, T>
+        [[nodiscard]] Result inspect(F &&f) &&
+        {
+            if (is_ok())
+            {
+                if constexpr (std::is_void_v<T>)
+                    std::invoke(f);
+                else
+                    std::invoke(f, ok_);
+            }
+            return std::move(*this);
+        }
+
+        /**
          * @brief Invokes @p f on the error value if Err, then returns `*this` unchanged.
          *
          * @tparam F callable observing the error value
@@ -949,6 +974,26 @@ namespace pjh::result
             if (is_err())
                 std::invoke(f, err_);
             return *this;
+        }
+
+        /**
+         * @brief Invokes @p f on the error value if Err, then returns `*this` by value.
+         *
+         * The rvalue counterpart of the `const &` overload: the observer runs before
+         * the object is moved out, so the result stays valid when chained from a
+         * temporary.
+         *
+         * @tparam F callable observing the error value
+         * @param f the observer
+         * @return `*this` moved into a new `Result`
+         */
+        template <typename F>
+            requires std::invocable<F, const E &>
+        [[nodiscard]] Result inspect_err(F &&f) &&
+        {
+            if (is_err())
+                std::invoke(f, err_);
+            return std::move(*this);
         }
 
         /**
