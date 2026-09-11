@@ -27,6 +27,19 @@ namespace
     {
         return std::to_string(v) + s;
     }
+
+    // Task 16: value-category overloads with distinct return types. Option's const
+    // members bind the value as `const T&`, so map_result_t must pick `const int&`.
+    struct OverloadedOptionMap
+    {
+        int operator()(int &&) const;
+        long operator()(const int &) const;
+    };
+
+    struct LongDefault
+    {
+        long operator()() const;
+    };
 }
 
 // 编译期：跨值类型 zip / zip_with 的返回类型
@@ -46,6 +59,21 @@ static_assert(std::is_same_v<
               decltype(std::declval<IntOpt>().zip_with(
                   std::declval<res::Option<std::string>>(), join_int_str)),
               res::Option<std::string>>);
+
+// 编译期：Option 的 map/map_or/map_or_else 同样按 `const T&` 推导返回类型
+static_assert(std::is_same_v<res::detail::map_result_t<OverloadedOptionMap, int>, long>);
+static_assert(std::is_same_v<
+              decltype(std::declval<const IntOpt &>().map(
+                  std::declval<OverloadedOptionMap>())),
+              res::Option<long>>);
+static_assert(std::is_same_v<
+              decltype(std::declval<const IntOpt &>().map_or(
+                  std::declval<long>(), std::declval<OverloadedOptionMap>())),
+              long>);
+static_assert(std::is_same_v<
+              decltype(std::declval<const IntOpt &>().map_or_else(
+                  std::declval<LongDefault>(), std::declval<OverloadedOptionMap>())),
+              long>);
 
 // 编译期：右值调用按值返回，左值调用仍返回 const 引用
 static_assert(std::is_same_v<

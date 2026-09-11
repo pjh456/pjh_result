@@ -40,6 +40,20 @@ namespace
     {
         int operator()(const int &) const;
     };
+
+    // Task 16: overloaded on value category with distinct return types. The const
+    // members bind the success value as `const T&`, so the declared result type
+    // must resolve to the `const int&` overload, not the `int&&` one.
+    struct OverloadedMap
+    {
+        int operator()(int &&) const;
+        long operator()(const int &) const;
+    };
+
+    struct ErrorToLong
+    {
+        long operator()(const std::string &) const;
+    };
 }
 
 /// Whether the const-member combinators accept the callable `F` on `R`'s value.
@@ -55,6 +69,22 @@ static_assert(!res::detail::MapCallable<RvalueOnly, int>);
 static_assert(res::detail::MapCallable<ConstRefOnly, int>);
 static_assert(!MapCompat<StrResult, RvalueOnly>);
 static_assert(MapCompat<StrResult, ConstRefOnly>);
+
+// 编译期：map_result_t 以 `const T&` 推导返回类型，与 const 成员的实际调用形式一致
+static_assert(std::is_same_v<res::detail::map_result_t<OverloadedMap, int>, long>);
+static_assert(res::detail::MapCallable<OverloadedMap, int>);
+static_assert(std::is_same_v<
+              decltype(std::declval<const StrResult &>().map(
+                  std::declval<OverloadedMap>())),
+              res::Result<long, std::string>>);
+static_assert(std::is_same_v<
+              decltype(std::declval<const StrResult &>().map_or(
+                  std::declval<long>(), std::declval<OverloadedMap>())),
+              long>);
+static_assert(std::is_same_v<
+              decltype(std::declval<const StrResult &>().map_or_else(
+                  std::declval<ErrorToLong>(), std::declval<OverloadedMap>())),
+              long>);
 
 // 编译期：右值调用按值返回，左值调用仍返回 const 引用
 static_assert(std::is_same_v<

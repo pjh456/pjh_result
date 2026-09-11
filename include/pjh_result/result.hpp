@@ -36,12 +36,21 @@ namespace pjh::result
             Moved
         };
 
-        /// @brief Result type of `map`: `f()` when `T = void`, otherwise `f(T)`.
-        ///        Evaluated lazily to avoid forming a `void` argument.
+        /// @brief Result type of `map`: `f()` when `T = void`, otherwise `f(const T&)`.
+        ///        Evaluated lazily to avoid forming a `void` argument. When `F` is not
+        ///        invocable with `const T&` the trait degrades to `void` instead of
+        ///        hard-erroring, so the alias stays usable in return types while the
+        ///        `MapCallable` constraint rejects `F`.
         template <typename F, typename T, bool = std::is_void_v<T>>
         struct map_result
         {
-            using type = std::invoke_result_t<F, T>;
+            using type = std::invoke_result_t<F, const T &>;
+        };
+        template <typename F, typename T>
+            requires(!std::invocable<F, const T &>)
+        struct map_result<F, T, false>
+        {
+            using type = void;
         };
         template <typename F, typename T>
         struct map_result<F, T, true>
