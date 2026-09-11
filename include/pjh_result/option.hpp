@@ -12,6 +12,7 @@
 #include <type_traits>
 #include <utility>
 
+#include "pjh_result/detail/iterator.hpp"
 #include "pjh_result/result.hpp"
 
 namespace pjh::result
@@ -203,6 +204,100 @@ namespace pjh::result
     public:
         /// @brief The value type (useful for metaprogramming).
         using value_type = T;
+
+        /// @brief Immutable iterator over the contained value (`Some` yields one
+        ///        element, `None` yields none).
+        using Iter = detail::SingleIter<StoredT, true>;
+        /// @brief Mutable iterator over the contained value (`Some` yields one
+        ///        element, `None` yields none).
+        using IterMut = detail::SingleIter<StoredT, false>;
+
+        /**
+         * @brief Returns an iterator over the contained value.
+         *
+         * Yields exactly one element (`const T &`) when `is_some()`, and an empty
+         * range when `is_none()`. The iterator is itself a range, so
+         * `for (const auto &x : o.iter())` and `std::ranges::find(o.iter(), v)`
+         * both work. Available only when `T` is non-void.
+         *
+         * @return a zero-or-one element forward iterator borrowing `*this`
+         * @warning The returned iterator borrows `*this`; it must not outlive the
+         *          source and the source must not be reassigned, `take()`n from, or
+         *          otherwise mutated while the iterator is in use.
+         */
+        [[nodiscard]] auto iter() const & noexcept -> Iter
+            requires(!std::is_void_v<T>)
+        {
+            return has_value_ ? Iter{std::addressof(value_)} : Iter{};
+        }
+
+        /// @brief Deleted: an iterator into a temporary would dangle.
+        void iter() && = delete;
+        /// @brief Deleted: an iterator into a temporary would dangle.
+        void iter() const && = delete;
+
+        /**
+         * @brief Returns a mutable iterator over the contained value.
+         *
+         * Yields exactly one element (`T &`) when `is_some()`, and an empty range
+         * when `is_none()`. Writes through the iterator are visible on `*this`.
+         * Callable only on a non-const lvalue; available only when `T` is non-void.
+         *
+         * @return a zero-or-one element forward iterator borrowing `*this`
+         * @warning The returned iterator borrows `*this`; it must not outlive the
+         *          source and the source must not be reassigned, `take()`n from, or
+         *          otherwise mutated while the iterator is in use.
+         */
+        [[nodiscard]] auto iter_mut() & noexcept -> IterMut
+            requires(!std::is_void_v<T>)
+        {
+            return has_value_ ? IterMut{std::addressof(value_)} : IterMut{};
+        }
+
+        /**
+         * @brief Returns a mutable iterator over the contained value (range-for entry).
+         *
+         * Allows `for (auto &x : o)` and classic algorithms. Available only when
+         * `T` is non-void.
+         *
+         * @return a mutable zero-or-one element forward iterator
+         * @warning An iterator stored out of a temporary returned by this function
+         *          dangles once the temporary dies (same rule as standard
+         *          containers); use it only within a range-for or algorithm call.
+         */
+        [[nodiscard]] auto begin() noexcept -> IterMut
+            requires(!std::is_void_v<T>)
+        {
+            return has_value_ ? IterMut{std::addressof(value_)} : IterMut{};
+        }
+
+        /// @brief One-past-the-end position of the value range.
+        [[nodiscard]] auto end() noexcept -> IterMut
+            requires(!std::is_void_v<T>)
+        {
+            return IterMut{};
+        }
+
+        /**
+         * @brief Returns an immutable iterator over the contained value (range-for entry).
+         *
+         * Allows `for (const auto &x : std::as_const(o))` and classic algorithms on
+         * a const option. Available only when `T` is non-void.
+         *
+         * @return an immutable zero-or-one element forward iterator
+         */
+        [[nodiscard]] auto begin() const noexcept -> Iter
+            requires(!std::is_void_v<T>)
+        {
+            return has_value_ ? Iter{std::addressof(value_)} : Iter{};
+        }
+
+        /// @brief One-past-the-end position of the const value range.
+        [[nodiscard]] auto end() const noexcept -> Iter
+            requires(!std::is_void_v<T>)
+        {
+            return Iter{};
+        }
 
         /// @brief Whether the option currently holds a value.
         bool is_some() const noexcept { return has_value_; }

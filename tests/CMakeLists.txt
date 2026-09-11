@@ -29,7 +29,8 @@ set(PJH_RESULT_TEST_SOURCES
     test_interop.cpp
     test_context.cpp
     test_diagnostic.cpp
-    test_borrow.cpp)
+    test_borrow.cpp
+    test_iter.cpp)
 
 add_executable(pjh_result_tests ${PJH_RESULT_TEST_SOURCES})
 target_link_libraries(pjh_result_tests PRIVATE pjh_result doctest)

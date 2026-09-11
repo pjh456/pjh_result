@@ -13,6 +13,7 @@
 #include <utility>
 
 #include "pjh_result/context.hpp"
+#include "pjh_result/detail/iterator.hpp"
 #include "pjh_result/detail/traits.hpp"
 #include "pjh_result/errors.hpp"
 
@@ -357,6 +358,108 @@ namespace pjh::result
         bool is_err() const noexcept { return tag_ == detail::Tag::Err; }
         /// @brief Whether the result is in the moved-from state (post rvalue-unwrap).
         bool is_moved() const noexcept { return tag_ == detail::Tag::Moved; }
+
+        /// @brief Immutable iterator over the success value (`Ok` yields one element,
+        ///        `Err` yields none).
+        using Iter = detail::SingleIter<OkT, true>;
+        /// @brief Mutable iterator over the success value (`Ok` yields one element,
+        ///        `Err` yields none).
+        using IterMut = detail::SingleIter<OkT, false>;
+
+        /**
+         * @brief Returns an iterator over the success value.
+         *
+         * Yields exactly one element (`const T &`) when `is_ok()`, and an empty
+         * range when `is_err()`. The iterator is itself a range, so
+         * `for (const auto &x : r.iter())` and `std::ranges::find(r.iter(), v)`
+         * both work. Available only when `T` is non-void.
+         *
+         * @return a zero-or-one element forward iterator borrowing `*this`
+         * @throws bad_result_access when the result is in the Moved state
+         * @warning The returned iterator borrows `*this`; it must not outlive the
+         *          source and the source must not be reassigned or consumed while
+         *          the iterator is in use.
+         */
+        [[nodiscard]] auto iter() const & -> Iter
+            requires(!std::is_void_v<T>)
+        {
+            require_not_moved_();
+            return is_ok() ? Iter{std::addressof(ok_)} : Iter{};
+        }
+
+        /// @brief Deleted: an iterator into a temporary would dangle.
+        void iter() && = delete;
+        /// @brief Deleted: an iterator into a temporary would dangle.
+        void iter() const && = delete;
+
+        /**
+         * @brief Returns a mutable iterator over the success value.
+         *
+         * Yields exactly one element (`T &`) when `is_ok()`, and an empty range
+         * when `is_err()`. Writes through the iterator are visible on `*this`.
+         * Callable only on a non-const lvalue; available only when `T` is non-void.
+         *
+         * @return a zero-or-one element forward iterator borrowing `*this`
+         * @throws bad_result_access when the result is in the Moved state
+         * @warning The returned iterator borrows `*this`; it must not outlive the
+         *          source and the source must not be reassigned or consumed while
+         *          the iterator is in use.
+         */
+        [[nodiscard]] auto iter_mut() & -> IterMut
+            requires(!std::is_void_v<T>)
+        {
+            require_not_moved_();
+            return is_ok() ? IterMut{std::addressof(ok_)} : IterMut{};
+        }
+
+        /**
+         * @brief Returns a mutable iterator over the success value (range-for entry).
+         *
+         * Allows `for (auto &x : r)` and classic algorithms. Available only when
+         * `T` is non-void.
+         *
+         * @return a mutable zero-or-one element forward iterator
+         * @throws bad_result_access when the result is in the Moved state
+         * @warning An iterator stored out of a temporary returned by this function
+         *          dangles once the temporary dies (same rule as standard
+         *          containers); use it only within a range-for or algorithm call.
+         */
+        [[nodiscard]] auto begin() -> IterMut
+            requires(!std::is_void_v<T>)
+        {
+            require_not_moved_();
+            return is_ok() ? IterMut{std::addressof(ok_)} : IterMut{};
+        }
+
+        /// @brief One-past-the-end position of the success range.
+        [[nodiscard]] auto end() noexcept -> IterMut
+            requires(!std::is_void_v<T>)
+        {
+            return IterMut{};
+        }
+
+        /**
+         * @brief Returns an immutable iterator over the success value (range-for entry).
+         *
+         * Allows `for (const auto &x : std::as_const(r))` and classic algorithms on
+         * a const result. Available only when `T` is non-void.
+         *
+         * @return an immutable zero-or-one element forward iterator
+         * @throws bad_result_access when the result is in the Moved state
+         */
+        [[nodiscard]] auto begin() const -> Iter
+            requires(!std::is_void_v<T>)
+        {
+            require_not_moved_();
+            return is_ok() ? Iter{std::addressof(ok_)} : Iter{};
+        }
+
+        /// @brief One-past-the-end position of the const success range.
+        [[nodiscard]] auto end() const noexcept -> Iter
+            requires(!std::is_void_v<T>)
+        {
+            return Iter{};
+        }
 
         /**
          * @brief Whether the result is Ok and the success value satisfies @p f.
