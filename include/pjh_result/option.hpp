@@ -1171,7 +1171,7 @@ namespace pjh::result
          * @return `Some(value)` if present and @p pred holds, otherwise `None`
          */
         template <typename F>
-            requires detail::MapCallable<F, T> && std::move_constructible<StoredT>
+            requires detail::MutMapCallable<F, T> && std::move_constructible<StoredT>
         [[nodiscard]] Option filter(F &&pred) &&
         {
             if (has_value_)

@@ -38,6 +38,26 @@ namespace
 
     template <typename T>
     concept RvalueGetOrInsertWith = requires(T t) { std::move(t).get_or_insert_with([] { return 1; }); };
+
+    template <typename T>
+    concept RvalueFilterMutable = requires(T t) {
+        std::move(t).filter([](int &v) { return v > 0; });
+    };
+
+    template <typename T>
+    concept ConstFilterMutable = requires(const T &t) {
+        t.filter([](int &v) { return v > 0; });
+    };
+
+    template <typename T>
+    concept RvalueFilterConstRef = requires(T t) {
+        std::move(t).filter([](const int &v) { return v > 0; });
+    };
+
+    template <typename T>
+    concept RvalueFilterNullary = requires(T t) {
+        std::move(t).filter([] { return true; });
+    };
 }
 
 // 编译期：take_if 返回 Option<T>，且只能作用于非 const 左值
@@ -60,6 +80,12 @@ static_assert(requires(res::Option<int> &o) {
     o.get_or_insert_with([] { return 3; });
 });
 static_assert(std::is_same_v<decltype(std::declval<res::Option<int> &>().insert(1)), int &>);
+
+// 编译期：filter()&& 体传可变左值，接受 F(T&)；const& 体传 const T&，仍拒绝 F(T&)
+static_assert(RvalueFilterMutable<res::Option<int>>);
+static_assert(!ConstFilterMutable<res::Option<int>>);
+static_assert(RvalueFilterConstRef<res::Option<int>>);
+static_assert(RvalueFilterNullary<res::Option<void>>);
 
 TEST_CASE("take moves the value out and leaves None")
 {
@@ -129,6 +155,28 @@ TEST_CASE("get_or_insert_with calls f when None")
     bool called = false;
     CHECK(some.get_or_insert_with([&] { called = true; return -1; }) == 5);
     CHECK(!called);
+}
+
+TEST_CASE("filter rvalue accepts a mutable-lvalue predicate")
+{
+    auto o = res::Option<int>::Some(41);
+    auto kept = std::move(o).filter(
+        [](int &v)
+        {
+            ++v;             // 41 -> 42
+            return v == 42;
+        });
+    CHECK(kept.is_some());
+    CHECK(kept.unwrap() == 42);
+
+    auto dropped_src = res::Option<int>::Some(41);
+    auto dropped = std::move(dropped_src).filter(
+        [](int &v)
+        {
+            ++v;             // 41 -> 42
+            return v == 99;
+        });
+    CHECK(dropped.is_none());
 }
 
 TEST_CASE("mutations do not leak")
