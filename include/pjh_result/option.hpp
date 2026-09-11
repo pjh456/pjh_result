@@ -58,8 +58,8 @@ namespace pjh::result
         using StoredT = std::conditional_t<std::is_void_v<T>, Unit, T>;
 
         static_assert(
-            std::is_move_constructible_v<StoredT>,
-            "pjh::result::Option requires T to be move constructible");
+            std::is_nothrow_move_constructible_v<StoredT>,
+            "pjh::result::Option requires T to be nothrow move constructible");
 
         bool has_value_;
         union
