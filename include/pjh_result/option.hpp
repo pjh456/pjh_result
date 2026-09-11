@@ -1355,7 +1355,7 @@ namespace pjh::result
             requires std::move_constructible<E> &&
                      detail::ValidResultTypes<T, E> && detail::NotResult<E> &&
                      (!std::is_void_v<E>) && (!std::is_reference_v<E>)
-        [[nodiscard]] Result<T, E> ok_or(E err) const
+        [[nodiscard]] Result<T, E> ok_or(E err) const &
         {
             if (has_value_)
             {
@@ -1363,6 +1363,32 @@ namespace pjh::result
                     return Result<void, E>::Ok();
                 else
                     return Result<T, E>::Ok(value_);
+            }
+            return Result<T, E>::Err(std::move(err));
+        }
+
+        /// @overload (rvalue: moves the value out and leaves `*this` as `None`)
+        template <typename E>
+            requires std::move_constructible<E> &&
+                     detail::ValidResultTypes<T, E> && detail::NotResult<E> &&
+                     (!std::is_void_v<E>) && (!std::is_reference_v<E>)
+        [[nodiscard]] Result<T, E> ok_or(E err) &&
+        {
+            if (has_value_)
+            {
+                if constexpr (std::is_void_v<T>)
+                {
+                    destroy_();
+                    has_value_ = false;
+                    return Result<void, E>::Ok();
+                }
+                else
+                {
+                    auto v = std::move(value_);
+                    destroy_();
+                    has_value_ = false;
+                    return Result<T, E>::Ok(std::move(v));
+                }
             }
             return Result<T, E>::Err(std::move(err));
         }
@@ -1384,7 +1410,7 @@ namespace pjh::result
                      detail::NotResult<std::invoke_result_t<F>> &&
                      (!std::is_void_v<std::invoke_result_t<F>>) &&
                      (!std::is_reference_v<std::invoke_result_t<F>>)
-        [[nodiscard]] auto ok_or_else(F &&f) const -> Result<T, std::invoke_result_t<F>>
+        [[nodiscard]] auto ok_or_else(F &&f) const & -> Result<T, std::invoke_result_t<F>>
         {
             using E = std::invoke_result_t<F>;
             if (has_value_)
@@ -1393,6 +1419,35 @@ namespace pjh::result
                     return Result<void, E>::Ok();
                 else
                     return Result<T, E>::Ok(value_);
+            }
+            return Result<T, E>::Err(std::invoke(f));
+        }
+
+        /// @overload (rvalue: moves the value out and leaves `*this` as `None`)
+        template <typename F>
+            requires std::invocable<F> &&
+                     detail::ValidResultTypes<T, std::invoke_result_t<F>> &&
+                     detail::NotResult<std::invoke_result_t<F>> &&
+                     (!std::is_void_v<std::invoke_result_t<F>>) &&
+                     (!std::is_reference_v<std::invoke_result_t<F>>)
+        [[nodiscard]] auto ok_or_else(F &&f) && -> Result<T, std::invoke_result_t<F>>
+        {
+            using E = std::invoke_result_t<F>;
+            if (has_value_)
+            {
+                if constexpr (std::is_void_v<T>)
+                {
+                    destroy_();
+                    has_value_ = false;
+                    return Result<void, E>::Ok();
+                }
+                else
+                {
+                    auto v = std::move(value_);
+                    destroy_();
+                    has_value_ = false;
+                    return Result<T, E>::Ok(std::move(v));
+                }
             }
             return Result<T, E>::Err(std::invoke(f));
         }

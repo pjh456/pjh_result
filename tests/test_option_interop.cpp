@@ -2,6 +2,7 @@
 
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "pjh_result/option.hpp"
@@ -56,6 +57,18 @@ concept OkOrElseCompat = requires(const O &o, F f) {
     o.ok_or_else(f);
 };
 
+/// Whether `ok_or` is available on an rvalue `Option` (moves the value out).
+template <typename O, typename E>
+concept RvalueOkOrCompat = requires(O &&o, E e) {
+    std::move(o).ok_or(e);
+};
+
+/// Whether `ok_or_else` is available on an rvalue `Option` (moves the value out).
+template <typename O, typename F>
+concept RvalueOkOrElseCompat = requires(O &&o, F f) {
+    std::move(o).ok_or_else(f);
+};
+
 // 编译期：ok_or_else 接受返回非 void 的 F，干净拒绝返回 void 的 F。
 static_assert(OkOrElseCompat<res::Option<int>, StringProducer>);
 static_assert(!OkOrElseCompat<res::Option<int>, VoidProducer>);
@@ -70,6 +83,14 @@ static_assert(!OkOrCompat<res::Option<int>, res::Result<int, std::string>>);
 static_assert(!OkOrElseCompat<res::Option<int>, IntProducer>);
 static_assert(!OkOrElseCompat<res::Option<int>, RefProducer>);
 static_assert(!OkOrElseCompat<res::Option<int>, ResultProducer>);
+
+// 编译期：右值重载对 move-only 成功值可用；拷贝型两边都可用；void 亦可。
+static_assert(RvalueOkOrCompat<res::Option<std::unique_ptr<int>>, std::string>);
+static_assert(RvalueOkOrCompat<res::Option<int>, std::string>);
+static_assert(RvalueOkOrCompat<res::Option<void>, std::string>);
+static_assert(
+    RvalueOkOrElseCompat<res::Option<std::unique_ptr<int>>, StringProducer>);
+static_assert(RvalueOkOrElseCompat<res::Option<int>, StringProducer>);
 
 /// Whether `transpose` is available on a const lvalue `Result`.
 template <typename R>
@@ -152,6 +173,52 @@ TEST_CASE("ok_or works with move-only error type")
     auto e = n.ok_or(std::unique_ptr<int>(new int(99)));
     CHECK(e.is_err());
     CHECK(*e.unwrap_err() == 99);
+}
+
+TEST_CASE("ok_or rvalue moves a move-only Some value and consumes the source")
+{
+    auto o = res::Option<std::unique_ptr<int>>::Some(std::make_unique<int>(7));
+    auto r = std::move(o).ok_or(std::string("missing"));
+    REQUIRE(r.is_ok());
+    CHECK(*r.unwrap() == 7);
+    CHECK(o.is_none());
+}
+
+TEST_CASE("ok_or rvalue on None yields Err")
+{
+    auto o = res::Option<std::unique_ptr<int>>::None();
+    auto r = std::move(o).ok_or(std::string("missing"));
+    REQUIRE(r.is_err());
+    CHECK(r.unwrap_err() == "missing");
+}
+
+TEST_CASE("ok_or rvalue works with void Option and consumes the source")
+{
+    auto o = res::Option<void>::Some();
+    auto r = std::move(o).ok_or(std::string("missing"));
+    CHECK(r.is_ok());
+    CHECK(o.is_none());
+}
+
+TEST_CASE("ok_or_else rvalue moves a move-only Some value and consumes the source")
+{
+    auto o = res::Option<std::unique_ptr<int>>::Some(std::make_unique<int>(7));
+    auto r = std::move(o).ok_or_else(
+        []()
+        { return std::string("missing"); });
+    REQUIRE(r.is_ok());
+    CHECK(*r.unwrap() == 7);
+    CHECK(o.is_none());
+}
+
+TEST_CASE("ok_or_else rvalue on None computes the error")
+{
+    auto o = res::Option<std::unique_ptr<int>>::None();
+    auto r = std::move(o).ok_or_else(
+        []()
+        { return std::string("computed"); });
+    REQUIRE(r.is_err());
+    CHECK(r.unwrap_err() == "computed");
 }
 
 TEST_CASE("transpose Some(Ok) becomes Ok(Some)")

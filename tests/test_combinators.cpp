@@ -668,6 +668,48 @@ TEST_CASE("transpose throws on moved Result")
     CHECK_THROWS_AS((void)std::move(r).transpose(), bad_access);
 }
 
+TEST_CASE("transpose lvalue copies the inner Option")
+{
+    using R = res::Result<res::Option<int>, std::string>;
+    auto r = R::Ok(res::Option<int>::Some(1));
+    auto t = r.transpose();
+    REQUIRE(t.is_some());
+    CHECK(t.unwrap().unwrap() == 1);
+    CHECK(r.is_ok()); // const& path leaves the source intact
+}
+
+TEST_CASE("transpose rvalue moves a move-only inner Option value")
+{
+    using Ptr = std::unique_ptr<int>;
+    using R = res::Result<res::Option<Ptr>, std::string>;
+
+    auto r = R::Ok(res::Option<Ptr>::Some(std::make_unique<int>(7)));
+    auto t = std::move(r).transpose();
+    REQUIRE(t.is_some());
+    REQUIRE(t.unwrap().is_ok());
+    CHECK(*t.unwrap().unwrap() == 7);
+    CHECK(r.is_moved()); // source consumed
+
+    auto n = R::Ok(res::Option<Ptr>::None());
+    auto tn = std::move(n).transpose();
+    CHECK(tn.is_none());
+    CHECK(n.is_moved());
+}
+
+TEST_CASE("transpose rvalue moves a move-only error")
+{
+    using Ptr = std::unique_ptr<int>;
+    using E = std::unique_ptr<std::string>;
+    using R = res::Result<res::Option<Ptr>, E>;
+
+    auto r = R::Err(std::make_unique<std::string>("e"));
+    auto t = std::move(r).transpose();
+    REQUIRE(t.is_some());
+    REQUIRE(t.unwrap().is_err());
+    CHECK(*t.unwrap().unwrap_err() == "e");
+    CHECK(r.is_moved());
+}
+
 TEST_CASE("inspect rvalue observes only the active branch and returns by value")
 {
     int ok_calls = 0;
