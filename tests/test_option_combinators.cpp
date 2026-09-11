@@ -52,6 +52,42 @@ namespace
         int operator()(int, int) const;
     };
 
+    // Task 40: `or_else`'s Some echo branch rebuilds the returned Option's value from
+    // the receiver's `const T&` (or `T&&`). A value type that cannot be built from it
+    // must be cleanly rejected instead of hard-erroring in the body.
+    struct IntIncompatibleOptionValue
+    {
+        std::string text;
+    };
+
+    struct OptionOrElseBadEchoValue
+    {
+        res::Option<IntIncompatibleOptionValue> operator()() const;
+    };
+
+    // Positive controls: same value type echoes fine, as does a constructible one.
+    struct OptionOrElseGoodEcho
+    {
+        res::Option<int> operator()() const;
+    };
+
+    struct OptionOrElseLongEcho
+    {
+        res::Option<long> operator()() const;
+    };
+
+    // `T = void` requires the nullary echo `Ret::Some()`, so a returned Option with a
+    // non-void value type cannot be echoed. The void echo is a positive control.
+    struct OptionOrElseValuedFromVoid
+    {
+        res::Option<int> operator()() const;
+    };
+
+    struct OptionVoidOrElseGoodEcho
+    {
+        res::Option<void> operator()() const;
+    };
+
     // Task 35: exposes first_type / second_type and .first / .second members but is not
     // a std::pair, so PairType must reject it instead of letting unzip hard-error.
     struct PairLike
@@ -84,6 +120,18 @@ namespace
     template <typename O, typename F>
     concept ConstInspectCompat = requires(const O &o, F f) {
         o.inspect(f);
+    };
+
+    /// Whether `or_else` on a const lvalue accepts `F`.
+    template <typename O, typename F>
+    concept ConstOrElseCompat = requires(const O &o, F f) {
+        { o.or_else(f) };
+    };
+
+    /// Whether `or_else` on an rvalue accepts `F`.
+    template <typename O, typename F>
+    concept RvalueOrElseCompat = requires(O &&o, F f) {
+        { std::move(o).or_else(f) };
     };
 }
 
@@ -157,6 +205,19 @@ static_assert(RvalueInspectCompat<IntOpt, void (*)(int &)>);
 static_assert(!ConstInspectCompat<IntOpt, void (*)(int &)>);
 static_assert(RvalueInspectCompat<IntOpt, void (*)(const int &)>);
 static_assert(ConstInspectCompat<IntOpt, void (*)(const int &)>);
+
+// 编译期：or_else 的 Some 回传分支要按值类别重建 Ret 的 Some；无法构造时两个重载
+// 都干净拒绝（const& 用 const T&，&& 用 T&&），T=void 时要求 nullary Ret::Some()。
+static_assert(ConstOrElseCompat<IntOpt, OptionOrElseGoodEcho>);
+static_assert(RvalueOrElseCompat<IntOpt, OptionOrElseGoodEcho>);
+static_assert(ConstOrElseCompat<IntOpt, OptionOrElseLongEcho>);
+static_assert(RvalueOrElseCompat<IntOpt, OptionOrElseLongEcho>);
+static_assert(ConstOrElseCompat<res::Option<void>, OptionVoidOrElseGoodEcho>);
+static_assert(RvalueOrElseCompat<res::Option<void>, OptionVoidOrElseGoodEcho>);
+static_assert(!ConstOrElseCompat<IntOpt, OptionOrElseBadEchoValue>);
+static_assert(!RvalueOrElseCompat<IntOpt, OptionOrElseBadEchoValue>);
+static_assert(!ConstOrElseCompat<res::Option<void>, OptionOrElseValuedFromVoid>);
+static_assert(!RvalueOrElseCompat<res::Option<void>, OptionOrElseValuedFromVoid>);
 
 TEST_CASE("map transforms Some, passes None through")
 {
@@ -243,6 +304,26 @@ TEST_CASE("or_else recovers from None")
         []()
         { return res::Option<int>::Some(0); });
     CHECK(keep.unwrap() == 7);
+}
+
+TEST_CASE("or_else echoes a constructible value across types")
+{
+    auto rvalue = IntOpt::Some(7).or_else(
+        []()
+        { return res::Option<long>::Some(0L); });
+    static_assert(std::is_same_v<decltype(rvalue), res::Option<long>>);
+    CHECK(rvalue.unwrap() == 7L);
+
+    const auto src = IntOpt::Some(9);
+    auto lvalue = src.or_else(
+        []()
+        { return res::Option<long>::Some(0L); });
+    CHECK(lvalue.unwrap() == 9L);
+
+    auto voided = res::Option<void>::Some().or_else(
+        []()
+        { return res::Option<void>::None(); });
+    CHECK(voided.is_some());
 }
 
 TEST_CASE("filter keeps or drops the value")

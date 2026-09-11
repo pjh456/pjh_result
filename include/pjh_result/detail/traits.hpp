@@ -62,6 +62,11 @@ namespace pjh::result::detail
     template <typename>
     struct option_traits;
 
+    /// @brief The value type of an `Option`-like type `X`.
+    template <typename X>
+    using option_value_t =
+        typename option_traits<std::remove_cvref_t<X>>::value_type;
+
     /// @brief Satisfied when `X` is this library's `Option` (i.e. `option_traits` is
     ///        specialized for it). A stray `value_type` member (e.g. on `std::string`,
     ///        `std::vector` or a detail iterator) does not qualify.

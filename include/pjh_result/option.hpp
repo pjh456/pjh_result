@@ -1035,7 +1035,12 @@ namespace pjh::result
          * @return `*this` (as the result type) if Some, otherwise `f()`
          */
         template <typename F>
-            requires detail::OptionType<std::invoke_result_t<F>>
+            requires detail::OptionType<std::invoke_result_t<F>> &&
+                     ((std::is_void_v<T> &&
+                       std::is_void_v<detail::option_value_t<std::invoke_result_t<F>>>) ||
+                      (!std::is_void_v<T> &&
+                       std::constructible_from<
+                           detail::option_value_t<std::invoke_result_t<F>>, const T &>))
         auto or_else(F &&f) const & -> std::invoke_result_t<F>
         {
             using Ret = std::invoke_result_t<F>;
@@ -1055,7 +1060,12 @@ namespace pjh::result
          * @return `*this` (as the result type) if Some, otherwise `f()`
          */
         template <typename F>
-            requires detail::OptionType<std::invoke_result_t<F>>
+            requires detail::OptionType<std::invoke_result_t<F>> &&
+                     ((std::is_void_v<T> &&
+                       std::is_void_v<detail::option_value_t<std::invoke_result_t<F>>>) ||
+                      (!std::is_void_v<T> &&
+                       std::constructible_from<
+                           detail::option_value_t<std::invoke_result_t<F>>, T &&>))
         auto or_else(F &&f) && -> std::invoke_result_t<F>
         {
             using Ret = std::invoke_result_t<F>;
