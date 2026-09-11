@@ -195,6 +195,30 @@ concept MapOrElseCompat = requires(const R &r, D d) {
     r.map_or_else(d, OverloadedMap{});
 };
 
+/// Whether `inspect` on an rvalue accepts the callable `F` (the `T&` path).
+template <typename R, typename F>
+concept RvalueInspectCompat = requires(R &&r, F f) {
+    std::move(r).inspect(f);
+};
+
+/// Whether `inspect_err` on an rvalue accepts the callable `F` (the `E&` path).
+template <typename R, typename F>
+concept RvalueInspectErrCompat = requires(R &&r, F f) {
+    std::move(r).inspect_err(f);
+};
+
+/// Whether `inspect` on a const lvalue accepts the callable `F` (the `const T&` path).
+template <typename R, typename F>
+concept ConstInspectCompat = requires(const R &r, F f) {
+    r.inspect(f);
+};
+
+/// Whether `inspect_err` on a const lvalue accepts the callable `F` (the `const E&` path).
+template <typename R, typename F>
+concept ConstInspectErrCompat = requires(const R &r, F f) {
+    r.inspect_err(f);
+};
+
 // 编译期：MapCallable 以 `const T&` 判定，rvalue-only 可调用对象应被拒绝
 static_assert(!res::detail::MapCallable<RvalueOnly, int>);
 static_assert(res::detail::MapCallable<ConstRefOnly, int>);
@@ -305,6 +329,19 @@ static_assert(requires { std::declval<StrResult &&>().inspect(std::declval<void 
 static_assert(requires {
     std::declval<StrResult &&>().inspect_err(std::declval<void (*)(const std::string &)>());
 });
+
+// 编译期：右值 inspect/inspect_err 的函数体传非 const 左值（T& / E&），因此必须
+// 接受只收 `T&` / `E&` 的可调用对象；const& 版仍按 `const T&` / `const E&` 判定，
+// 必须干净拒绝同一可调用对象（任务 39）。
+static_assert(RvalueInspectCompat<StrResult, void (*)(int &)>);
+static_assert(RvalueInspectErrCompat<StrResult, void (*)(std::string &)>);
+static_assert(!ConstInspectCompat<StrResult, void (*)(int &)>);
+static_assert(!ConstInspectErrCompat<StrResult, void (*)(std::string &)>);
+// 反向控制：只收 const 引用的可调用对象在两个重载都仍可用。
+static_assert(ConstInspectCompat<StrResult, void (*)(const int &)>);
+static_assert(RvalueInspectCompat<StrResult, void (*)(const int &)>);
+static_assert(ConstInspectErrCompat<StrResult, void (*)(const std::string &)>);
+static_assert(RvalueInspectErrCompat<StrResult, void (*)(const std::string &)>);
 
 TEST_CASE("map transforms the Ok value")
 {
@@ -787,6 +824,23 @@ TEST_CASE("inspect_err rvalue observes only the error branch and returns by valu
     CHECK(calls == 1); // not invoked on Ok
     CHECK(moved_ok.is_ok());
     CHECK(ok.is_ok());
+}
+
+TEST_CASE("inspect/inspect_err rvalue pass a mutable lvalue to the observer")
+{
+    auto ok = StrResult::Ok(1);
+    auto out = std::move(ok).inspect(
+        [](int &v)
+        { v = 42; });
+    CHECK(out.is_ok());
+    CHECK(out.unwrap() == 42);
+
+    auto er = StrResult::Err(std::string("before"));
+    auto oute = std::move(er).inspect_err(
+        [](std::string &e)
+        { e = "after"; });
+    CHECK(oute.is_err());
+    CHECK(oute.unwrap_err() == "after");
 }
 
 TEST_CASE("inspect rvalue chains from a temporary Result")

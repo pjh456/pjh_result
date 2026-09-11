@@ -73,6 +73,18 @@ namespace
     {
         std::move(a).zip_with(std::move(b), f);
     };
+
+    /// Whether `inspect` on an rvalue accepts the callable `F` (the `T&` path).
+    template <typename O, typename F>
+    concept RvalueInspectCompat = requires(O &&o, F f) {
+        std::move(o).inspect(f);
+    };
+
+    /// Whether `inspect` on a const lvalue accepts the callable `F` (the `const T&` path).
+    template <typename O, typename F>
+    concept ConstInspectCompat = requires(const O &o, F f) {
+        o.inspect(f);
+    };
 }
 
 // 编译期：zip_with 拒绝返回 void 的组合子（应无匹配函数，而非函数体硬错）
@@ -138,6 +150,13 @@ namespace
 static_assert(!ConstRvalueInspect<IntOpt, void (*)(int)>);
 static_assert(ConstLvalueInspect<IntOpt, void (*)(int)>);
 static_assert(requires { std::declval<IntOpt &&>().inspect(std::declval<void (*)(int)>()); });
+
+// 编译期：右值 inspect 的函数体传非 const 左值（T&），因此必须接受只收 `int&`
+// 的可调用对象；const& 版仍按 `const int&` 判定，必须干净拒绝（任务 39）。
+static_assert(RvalueInspectCompat<IntOpt, void (*)(int &)>);
+static_assert(!ConstInspectCompat<IntOpt, void (*)(int &)>);
+static_assert(RvalueInspectCompat<IntOpt, void (*)(const int &)>);
+static_assert(ConstInspectCompat<IntOpt, void (*)(const int &)>);
 
 TEST_CASE("map transforms Some, passes None through")
 {
@@ -460,6 +479,16 @@ TEST_CASE("inspect rvalue observes only Some and returns by value")
         });
     CHECK(calls == 1); // not invoked on None
     CHECK(moved_none.is_none());
+}
+
+TEST_CASE("inspect rvalue passes a mutable lvalue to the observer")
+{
+    auto o = IntOpt::Some(1);
+    auto out = std::move(o).inspect(
+        [](int &v)
+        { v = 42; });
+    CHECK(out.is_some());
+    CHECK(out.unwrap() == 42);
 }
 
 TEST_CASE("inspect rvalue chains from a temporary Option")

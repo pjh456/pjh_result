@@ -150,6 +150,14 @@ namespace pjh::result
         concept MapCallable = (std::is_void_v<T> && std::invocable<F>) ||
                               (!std::is_void_v<T> && std::invocable<F, const T &>);
 
+        /// @brief Whether `f` is callable on the success value passed by the rvalue
+        ///        observers (`inspect(&&)`), which bind it as a mutable lvalue `T&`:
+        ///        requires `f()` when `T = void`, else `f(T&)`. The const& observers
+        ///        bind `const T&` and use `MapCallable` instead.
+        template <typename F, typename T>
+        concept MutMapCallable = (std::is_void_v<T> && std::invocable<F>) ||
+                                 (!std::is_void_v<T> && std::invocable<F, T &>);
+
         /// @brief Whether `f` applied to the const success value returns a `Result`.
         template <typename F, typename T>
         concept CrefResultFn =
@@ -1200,7 +1208,7 @@ namespace pjh::result
          * @throws bad_result_access when the result is in the Moved state
          */
         template <typename F>
-            requires detail::MapCallable<F, T>
+            requires detail::MutMapCallable<F, T>
         [[nodiscard]] Result inspect(F &&f) &&
         {
             require_not_moved_();
@@ -1251,7 +1259,7 @@ namespace pjh::result
          * @throws bad_result_access when the result is in the Moved state
          */
         template <typename F>
-            requires std::invocable<F, const E &>
+            requires std::invocable<F, E &>
         [[nodiscard]] Result inspect_err(F &&f) &&
         {
             require_not_moved_();

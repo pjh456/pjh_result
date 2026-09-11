@@ -965,7 +965,7 @@ namespace pjh::result
          * @return `*this` moved into a new `Option`
          */
         template <typename F>
-            requires detail::MapCallable<F, T>
+            requires detail::MutMapCallable<F, T>
         [[nodiscard]] Option inspect(F &&f) &&
         {
             if (has_value_)
