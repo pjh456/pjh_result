@@ -62,6 +62,31 @@ namespace
 static_assert(noexcept(std::declval<res::Context<Err> &&>().messages()));
 static_assert(noexcept(std::declval<const res::Context<Err> &>().messages()));
 
+namespace
+{
+    template <typename C>
+    concept RvalueRootCause = requires(C t) { std::move(t).root_cause(); };
+
+    template <typename C>
+    concept ConstRvalueRootCause = requires(const C &t) { std::move(t).root_cause(); };
+
+    template <typename C>
+    concept RvalueMessages = requires(C t) { std::move(t).messages(); };
+
+    template <typename C>
+    concept ConstRvalueMessages = requires(const C &t) { std::move(t).messages(); };
+}
+
+// 编译期：引用返回访问器的 const 右值形态被 delete 拒绝，避免临时量悬垂
+static_assert(RvalueRootCause<res::Context<Err>>);
+static_assert(RvalueMessages<res::Context<Err>>);
+static_assert(!ConstRvalueRootCause<res::Context<Err>>);
+static_assert(!ConstRvalueMessages<res::Context<Err>>);
+static_assert(requires(const res::Context<Err> &c) {
+    c.root_cause();
+    c.messages();
+});
+
 TEST_CASE("context on Ok passes the value through without constructing a context")
 {
     auto r = res::Result<int, Err>::Ok(42);

@@ -159,11 +159,15 @@ namespace pjh::result
 
         /// @brief The original (bottom) error.
         [[nodiscard]] const E &root_cause() const & noexcept { return cause_; }
+        /// @brief Deleted: binding the reference into a temporary would dangle.
+        const E &root_cause() const && = delete;
         /// @brief The original (bottom) error, moved out.
         [[nodiscard]] E &&root_cause() && noexcept { return std::move(cause_); }
 
         /// @brief The full context chain, ordered outermost-first.
         [[nodiscard]] const std::vector<std::string> &messages() const & noexcept { return chain_; }
+        /// @brief Deleted: binding the reference into a temporary would dangle.
+        const std::vector<std::string> &messages() const && = delete;
         /// @brief The full context chain (moved out), ordered outermost-first.
         [[nodiscard]] std::vector<std::string> messages() && noexcept { return std::move(chain_); }
 
