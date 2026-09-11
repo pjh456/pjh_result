@@ -4,6 +4,7 @@
 #include "pjh_result/errors.hpp"
 #include "pjh_result/context.hpp"
 #include "pjh_result/result.hpp"
+#include "pjh_result/diagnostic.hpp"
 #include "pjh_result/option.hpp"
 #include "pjh_result/interop.hpp"
 #include "pjh_result/macros.hpp"

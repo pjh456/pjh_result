@@ -14,6 +14,7 @@
 #include <concepts>
 #include <functional>
 #include <string>
+#include <string_view>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -165,6 +166,32 @@ namespace pjh::result
         [[nodiscard]] const std::vector<std::string> &messages() const & noexcept { return chain_; }
         /// @brief The full context chain (moved out), ordered outermost-first.
         [[nodiscard]] std::vector<std::string> messages() && { return std::move(chain_); }
+
+        /**
+         * @brief Outermost context message as a view (empty when no layer was attached).
+         *
+         * @note This is only the outermost layer, not the whole chain. Use
+         *       `pjh::result::render(*this)` for the full `"outer: inner: root"` text.
+         *       Never bind the returned view to a temporary `Context`.
+         * @note Enabled only when `E::message()` is convertible to `std::string_view`,
+         *       so `Context<E>` structurally satisfies `Diagnostic` exactly when `E` does.
+         */
+        [[nodiscard]] std::string_view message() const noexcept
+            requires requires(const E &e) {
+                { e.message() } -> std::convertible_to<std::string_view>;
+            }
+        {
+            return chain_.empty() ? std::string_view{} : std::string_view(chain_.front());
+        }
+
+        /// @brief Forwards the root cause's stable kind tag.
+        /// @note Enabled only when `E::kind()` exists; comparability is required by
+        ///       the `Diagnostic` concept, not by this member.
+        [[nodiscard]] decltype(auto) kind() const
+            requires requires(const E &e) { e.kind(); }
+        {
+            return root_cause().kind();
+        }
 
         /// @brief Iterator to the first (outermost) message.
         [[nodiscard]] auto begin() const noexcept { return chain_.begin(); }

@@ -27,7 +27,8 @@ set(PJH_RESULT_TEST_SOURCES
     test_option_interop.cpp
     test_option_compare.cpp
     test_interop.cpp
-    test_context.cpp)
+    test_context.cpp
+    test_diagnostic.cpp)
 
 add_executable(pjh_result_tests ${PJH_RESULT_TEST_SOURCES})
 target_link_libraries(pjh_result_tests PRIVATE pjh_result doctest)
@@ -55,3 +56,13 @@ add_test(
     NAME compile_fail.option_throwing_move
     COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target compile_fail_option_throwing_move)
 set_tests_properties(compile_fail.option_throwing_move PROPERTIES WILL_FAIL TRUE)
+
+# 负向编译测试：kind() 返回 void 的类型不满足 Diagnostic concept。
+add_executable(compile_fail_non_diagnostic EXCLUDE_FROM_ALL compile_fail/non_diagnostic.cpp)
+target_link_libraries(compile_fail_non_diagnostic PRIVATE pjh_result)
+target_include_directories(compile_fail_non_diagnostic PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+
+add_test(
+    NAME compile_fail.non_diagnostic
+    COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target compile_fail_non_diagnostic)
+set_tests_properties(compile_fail.non_diagnostic PROPERTIES WILL_FAIL TRUE)
