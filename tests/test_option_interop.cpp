@@ -119,6 +119,14 @@ static_assert(!RvalueTransposeCompat<res::Result<std::string, int>>);
 static_assert(!ConstTransposeCompat<res::Result<std::vector<int>, int>>);
 static_assert(!RvalueTransposeCompat<res::Result<std::vector<int>, int>>);
 
+// 编译期：内层 Option 的值类型与外层错误类型相同会构成非法的 Result<InnerV, E>，
+// Result::transpose 必须干净拒绝，而不是在返回类型实例化时硬错（任务 41）。
+static_assert(!ConstTransposeCompat<res::Result<res::Option<int>, int>>);
+static_assert(!RvalueTransposeCompat<res::Result<res::Option<int>, int>>);
+// 内层为 void 时 Result<void, E> 仍合法，保持可用。
+static_assert(ConstTransposeCompat<res::Result<res::Option<void>, int>>);
+static_assert(RvalueTransposeCompat<res::Result<res::Option<void>, int>>);
+
 TEST_CASE("ok_or converts Some to Ok, None to Err")
 {
     auto s = res::Option<int>::Some(7);

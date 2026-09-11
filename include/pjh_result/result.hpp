@@ -1654,7 +1654,8 @@ namespace pjh::result
          * @return the transposed `Option`
          */
         template <typename V = T>
-            requires detail::OptionType<V>
+            requires detail::OptionType<V> &&
+                     detail::ValidResultTypes<typename V::value_type, E>
         [[nodiscard]] auto transpose() const &
             -> Option<Result<typename V::value_type, E>>
         {
@@ -1678,7 +1679,8 @@ namespace pjh::result
 
         /// @overload
         template <typename V = T>
-            requires detail::OptionType<V>
+            requires detail::OptionType<V> &&
+                     detail::ValidResultTypes<typename V::value_type, E>
         [[nodiscard]] auto transpose() &&
             -> Option<Result<typename V::value_type, E>>
         {
