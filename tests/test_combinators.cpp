@@ -22,6 +22,10 @@ namespace
     {
         return StrResult::Ok(v);
     }
+
+    // Used only to fix the return type in the compile-time assertions below.
+    std::string error_from_int(const int &v);
+    std::string error_from_void();
 }
 
 // 编译期：右值调用按值返回，左值调用仍返回 const 引用
@@ -531,4 +535,82 @@ TEST_CASE("and_with and or_with throw on moved Result")
     CHECK_THROWS_AS(
         (void)r.and_with(res::Result<long, std::string>::Ok(1L)), bad_access);
     CHECK_THROWS_AS((void)r.or_with(res::Result<int, std::size_t>::Ok(9)), bad_access);
+}
+
+// 编译期：unwrap_err_or_else 返回 E，void 版接受无参可调用对象
+static_assert(std::is_same_v<
+              decltype(std::declval<const StrResult &>().unwrap_err_or_else(
+                  &error_from_int)),
+              std::string>);
+static_assert(std::is_same_v<
+              decltype(std::declval<const res::Result<void, std::string> &>()
+                           .unwrap_err_or_else(&error_from_void)),
+              std::string>);
+
+TEST_CASE("unwrap_err_or_else returns the error on Err without invoking f")
+{
+    auto r = StrResult::Err(std::string("e"));
+    int calls = 0;
+    auto e = r.unwrap_err_or_else(
+        [&](const int &)
+        {
+            ++calls;
+            return std::string("fallback");
+        });
+    CHECK(e == "e");
+    CHECK(calls == 0);
+}
+
+TEST_CASE("unwrap_err_or_else computes the error from the success value on Ok")
+{
+    auto r = StrResult::Ok(3);
+    CHECK(r.unwrap_err_or_else(
+              [](const int &v)
+              { return std::string(v, 'x'); }) == "xxx");
+    // callable taking T by value is also accepted
+    CHECK(r.unwrap_err_or_else(
+              [](int v)
+              { return std::string(v, 'y'); }) == "yyy");
+    CHECK(r.is_ok()); // receiver untouched
+}
+
+TEST_CASE("unwrap_err_or_else on Result<void, E>")
+{
+    auto ok = res::Result<void, std::string>::Ok();
+    CHECK(ok.unwrap_err_or_else([] { return std::string("fallback"); }) == "fallback");
+
+    auto err = res::Result<void, std::string>::Err(std::string("boom"));
+    bool called = false;
+    CHECK(err.unwrap_err_or_else(
+              [&]
+              {
+                  called = true;
+                  return std::string("nope");
+              }) == "boom");
+    CHECK(!called); // fallback not invoked on Err
+}
+
+TEST_CASE("unwrap_err_or_else works with a move-only success value")
+{
+    auto ok = res::Result<std::unique_ptr<int>, std::string>::Ok(
+        std::unique_ptr<int>(new int(4)));
+    CHECK(ok.unwrap_err_or_else(
+              [](const std::unique_ptr<int> &p)
+              { return std::string(*p, 'z'); }) == "zzzz");
+
+    auto err = res::Result<std::unique_ptr<int>, std::string>::Err(std::string("bad"));
+    CHECK(err.unwrap_err_or_else(
+              [](const std::unique_ptr<int> &)
+              { return std::string("x"); }) == "bad");
+}
+
+TEST_CASE("unwrap_err_or_else throws on moved Result")
+{
+    auto r = StrResult::Ok(5);
+    std::move(r).unwrap();
+    CHECK_THROWS_AS(
+        (void)r.unwrap_err_or_else(
+            [](const int &)
+            { return std::string("f"); }),
+        bad_access);
 }

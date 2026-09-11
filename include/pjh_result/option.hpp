@@ -453,6 +453,48 @@ namespace pjh::result
         }
 
         /**
+         * @brief Splits `Some((a, b))` into `(Some(a), Some(b))`; `None` becomes
+         *        `(None, None)`. Inverse of `zip`.
+         *
+         * Available only when the value type exposes `first_type` / `second_type`
+         * (e.g. `std::pair`); reference element types are not supported.
+         *
+         * @tparam U pair-like value type (deduced from `T`)
+         * @return `std::pair<Option<A>, Option<B>>` for a value type `std::pair<A, B>`
+         */
+        template <typename U = T>
+            requires detail::PairType<U>
+        [[nodiscard]] auto unzip() const &
+            -> std::pair<Option<typename U::first_type>, Option<typename U::second_type>>
+        {
+            using A = typename U::first_type;
+            using B = typename U::second_type;
+            if (has_value_)
+                return std::make_pair(Option<A>::Some(value_.first),
+                                      Option<B>::Some(value_.second));
+            return std::make_pair(Option<A>::None(), Option<B>::None());
+        }
+
+        /// @overload (rvalue: moves the pair elements and leaves `*this` as `None`)
+        template <typename U = T>
+            requires detail::PairType<U>
+        [[nodiscard]] auto unzip() &&
+            -> std::pair<Option<typename U::first_type>, Option<typename U::second_type>>
+        {
+            using A = typename U::first_type;
+            using B = typename U::second_type;
+            if (has_value_)
+            {
+                auto p = std::make_pair(Option<A>::Some(std::move(value_.first)),
+                                        Option<B>::Some(std::move(value_.second)));
+                destroy_();
+                has_value_ = false;
+                return p;
+            }
+            return std::make_pair(Option<A>::None(), Option<B>::None());
+        }
+
+        /**
          * @brief Returns `Some` on exactly one of `*this` and @p other being `Some`;
          *        `None` when both are `Some` or both are `None`.
          *
@@ -1057,6 +1099,40 @@ namespace pjh::result
                 has_value_ = false;
             }
             return out;
+        }
+
+        /**
+         * @brief Takes the value out only if `pred(value)` is true (Rust `Option::take_if`).
+         *
+         * The predicate receives a mutable reference and may modify the value even when
+         * it returns false; the value is removed (and `*this` becomes `None`) only when
+         * the predicate returns true. Callable only on an lvalue (Rust `&mut self`).
+         *
+         * @tparam F predicate on the value
+         * @param pred the predicate
+         * @return `Some(value)` if taken, otherwise `None`
+         */
+        template <typename F>
+            requires(!std::is_void_v<T>) && std::invocable<F, StoredT &> &&
+                    std::convertible_to<std::invoke_result_t<F, StoredT &>, bool>
+        [[nodiscard]] Option take_if(F &&pred) &
+        {
+            if (has_value_ && static_cast<bool>(std::invoke(pred, value_)))
+                return take();
+            return Option::None();
+        }
+
+        /**
+         * @overload (T = void: nullary predicate)
+         */
+        template <typename F>
+            requires std::is_void_v<T> && std::invocable<F> &&
+                     std::convertible_to<std::invoke_result_t<F>, bool>
+        [[nodiscard]] Option take_if(F &&pred) &
+        {
+            if (has_value_ && static_cast<bool>(std::invoke(pred)))
+                return take();
+            return Option::None();
         }
 
         /**

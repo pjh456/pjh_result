@@ -737,6 +737,41 @@ namespace pjh::result
         }
 
         /**
+         * @brief Unwraps the error value, or computes a fallback from the success value
+         *        if Ok. Lazy counterpart of `unwrap_err_or` (not a Rust std API).
+         *        Available only when `T` is non-void.
+         *
+         * @tparam F callable taking the success value and returning a value convertible
+         *         to `E`
+         * @param f fallback producer invoked in the Ok state
+         * @return the error value, or `f(success)`
+         */
+        template <typename F>
+            requires(!std::is_void_v<T>) && std::invocable<F, const T &> &&
+                    std::convertible_to<std::invoke_result_t<F, const T &>, E>
+        [[nodiscard]] E unwrap_err_or_else(F &&f) const
+        {
+            require_not_moved_();
+            if (is_err())
+                return err_;
+            return static_cast<E>(std::invoke(f, ok_));
+        }
+
+        /**
+         * @overload (T = void: nullary fallback producer)
+         */
+        template <typename F>
+            requires std::is_void_v<T> && std::invocable<F> &&
+                     std::convertible_to<std::invoke_result_t<F>, E>
+        [[nodiscard]] E unwrap_err_or_else(F &&f) const
+        {
+            require_not_moved_();
+            if (is_err())
+                return err_;
+            return static_cast<E>(std::invoke(f));
+        }
+
+        /**
          * @brief Unwraps the error value, throwing with a custom message if Ok.
          *
          * @param msg message carried by the thrown exception

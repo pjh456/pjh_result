@@ -19,6 +19,9 @@ namespace
     {
         return IntOpt::Some(v);
     }
+
+    template <typename T>
+    concept HasUnzip = requires(T t) { t.unzip(); };
 }
 
 // 编译期：右值调用按值返回，左值调用仍返回 const 引用
@@ -417,4 +420,60 @@ TEST_CASE("and_with and or_with chain with map")
                     .map([](int v)
                          { return v * 2; });
     CHECK(kept.unwrap() == 2);
+}
+
+// 编译期：unzip 把 Option<pair<A,B>> 拆成 pair<Option<A>, Option<B>>；
+// 非 pair 值类型（含 void）不提供该成员。
+static_assert(std::is_same_v<
+              decltype(std::declval<res::Option<std::pair<int, std::string>> &>()
+                           .unzip()),
+              std::pair<res::Option<int>, res::Option<std::string>>>);
+static_assert(HasUnzip<res::Option<std::pair<int, int>>>);
+static_assert(!HasUnzip<res::Option<void>>);
+static_assert(!HasUnzip<res::Option<int>>);
+
+TEST_CASE("unzip splits Some(pair) into a pair of Options")
+{
+    auto o = res::Option<std::pair<int, std::string>>::Some(
+        std::make_pair(1, std::string("hi")));
+    auto [a, b] = o.unzip();
+    CHECK(a.unwrap() == 1);
+    CHECK(b.unwrap() == "hi");
+    CHECK(o.is_some()); // const lvalue leaves the source intact
+}
+
+TEST_CASE("unzip of None yields a pair of Nones")
+{
+    auto o = res::Option<std::pair<int, std::string>>::None();
+    auto [a, b] = o.unzip();
+    CHECK(a.is_none());
+    CHECK(b.is_none());
+}
+
+TEST_CASE("unzip rvalue moves non-trivial and move-only elements")
+{
+    auto o = res::Option<std::pair<std::string, std::unique_ptr<int>>>::Some(
+        std::make_pair(std::string("x"), std::unique_ptr<int>(new int(7))));
+    auto [a, b] = std::move(o).unzip();
+    CHECK(a.unwrap() == "x");
+    CHECK(*b.unwrap() == 7);
+    CHECK(o.is_none()); // source consumed
+}
+
+TEST_CASE("unzip rvalue of None still yields Nones")
+{
+    auto o = res::Option<std::pair<std::string, std::unique_ptr<int>>>::None();
+    auto [a, b] = std::move(o).unzip();
+    CHECK(a.is_none());
+    CHECK(b.is_none());
+}
+
+TEST_CASE("unzip round-trips with zip")
+{
+    auto a = res::Option<int>::Some(4);
+    auto b = res::Option<int>::Some(5);
+    auto zipped = a.zip(b);
+    auto [ra, rb] = zipped.unzip();
+    CHECK(ra.unwrap() == 4);
+    CHECK(rb.unwrap() == 5);
 }

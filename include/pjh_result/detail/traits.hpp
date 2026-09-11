@@ -48,6 +48,14 @@ namespace pjh::result::detail
     concept OptionType = requires {
         typename std::remove_cvref_t<X>::value_type;
     };
+
+    /// @brief Satisfied when `X` exposes `first_type` / `second_type` (a pair-like type).
+    ///        Reference element types are not supported (an `Option` cannot store a reference).
+    template <typename X>
+    concept PairType = requires {
+        typename std::remove_cvref_t<X>::first_type;
+        typename std::remove_cvref_t<X>::second_type;
+    };
 }
 
 #endif // INCLUDE_PJH_RESULT_DETAIL_TRAITS_HPP
