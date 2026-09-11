@@ -184,7 +184,7 @@ namespace pjh::result
          * @note Enabled only when `E::message()` is convertible to `std::string_view`,
          *       so `Context<E>` structurally satisfies `Diagnostic` exactly when `E` does.
          */
-        [[nodiscard]] std::string_view message() const noexcept
+        [[nodiscard]] std::string_view message() const & noexcept
             requires requires(const E &e) {
                 { e.message() } -> std::convertible_to<std::string_view>;
             }
@@ -192,14 +192,24 @@ namespace pjh::result
             return chain_.empty() ? std::string_view{} : std::string_view(chain_.front());
         }
 
+        /// @brief Deleted: the returned view would dangle once the temporary dies.
+        std::string_view message() && = delete;
+        /// @brief Deleted: the returned view would dangle once the temporary dies.
+        std::string_view message() const && = delete;
+
         /// @brief Forwards the root cause's stable kind tag.
         /// @note Enabled only when `E::kind()` exists; comparability is required by
         ///       the `Diagnostic` concept, not by this member.
-        [[nodiscard]] decltype(auto) kind() const
+        [[nodiscard]] decltype(auto) kind() const &
             requires requires(const E &e) { e.kind(); }
         {
             return root_cause().kind();
         }
+
+        /// @brief Deleted: forwarding a possible reference into a temporary would dangle.
+        decltype(auto) kind() && = delete;
+        /// @brief Deleted: forwarding a possible reference into a temporary would dangle.
+        decltype(auto) kind() const && = delete;
 
         /// @brief Iterator to the first (outermost) message.
         [[nodiscard]] auto begin() const noexcept { return chain_.begin(); }

@@ -2,6 +2,7 @@
 
 #include <string>
 #include <string_view>
+#include <utility>
 
 #include "pjh_result.hpp"
 
@@ -41,6 +42,32 @@ namespace
     static_assert(!res::Diagnostic<res::Context<MessageOnly>>);
     static_assert(!res::Diagnostic<res::Context<VoidKind>>);
 
+    // Right-value forms of the view/reference accessors are deleted so a temporary
+    // cannot leave a dangling std::string_view / reference behind.
+    template <typename C>
+    concept RvalueMessage = requires(C t) { std::move(t).message(); };
+
+    template <typename C>
+    concept ConstRvalueMessage = requires(const C &t) { std::move(t).message(); };
+
+    template <typename C>
+    concept RvalueKind = requires(C t) { std::move(t).kind(); };
+
+    template <typename C>
+    concept ConstRvalueKind = requires(const C &t) { std::move(t).kind(); };
+}
+
+static_assert(!RvalueMessage<res::Context<GoodErr>>);
+static_assert(!ConstRvalueMessage<res::Context<GoodErr>>);
+static_assert(!RvalueKind<res::Context<GoodErr>>);
+static_assert(!ConstRvalueKind<res::Context<GoodErr>>);
+static_assert(requires(const res::Context<GoodErr> &c) {
+    c.message();
+    c.kind();
+});
+
+namespace
+{
     // Result + context macros integration helpers.
     res::Result<int, res::Context<GoodErr>> read(int v)
     {
