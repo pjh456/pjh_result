@@ -1298,8 +1298,10 @@ namespace pjh::result
          *
          * @param val the new value
          * @return reference to the stored value
+         * @note Callable only on a non-const lvalue; an rvalue temporary cannot be
+         *       stored into and its reference would dangle.
          */
-        StoredT &insert(StoredT val)
+        StoredT &insert(StoredT val) &
             requires(!std::is_void_v<T>)
         {
             destroy_();
@@ -1314,8 +1316,9 @@ namespace pjh::result
          *
          * @param val the value inserted when None
          * @return reference to the stored value
+         * @note Callable only on a non-const lvalue.
          */
-        StoredT &get_or_insert(StoredT val)
+        StoredT &get_or_insert(StoredT val) &
             requires(!std::is_void_v<T>)
         {
             if (!has_value_)
@@ -1332,8 +1335,9 @@ namespace pjh::result
          * currently None. Available only when `T` is non-void and default-initializable.
          *
          * @return reference to the stored value
+         * @note Callable only on a non-const lvalue.
          */
-        StoredT &get_or_insert_default()
+        StoredT &get_or_insert_default() &
             requires(!std::is_void_v<T>) && std::default_initializable<StoredT>
         {
             if (!has_value_)
@@ -1351,11 +1355,12 @@ namespace pjh::result
          * @tparam F nullary callable returning a value convertible to `StoredT`
          * @param f the fallback producer
          * @return reference to the stored value
+         * @note Callable only on a non-const lvalue.
          */
         template <typename F>
             requires(!std::is_void_v<T>) && std::invocable<F> &&
                     std::convertible_to<std::invoke_result_t<F>, StoredT>
-        StoredT &get_or_insert_with(F &&f)
+        StoredT &get_or_insert_with(F &&f) &
         {
             if (!has_value_)
             {

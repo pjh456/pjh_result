@@ -26,6 +26,18 @@ namespace
     concept ConstTakeIf = requires(const T &t) {
         t.take_if([](int &v) { return v > 0; });
     };
+
+    template <typename T>
+    concept RvalueInsert = requires(T t) { std::move(t).insert(1); };
+
+    template <typename T>
+    concept RvalueGetOrInsert = requires(T t) { std::move(t).get_or_insert(1); };
+
+    template <typename T>
+    concept RvalueGetOrInsertDefault = requires(T t) { std::move(t).get_or_insert_default(); };
+
+    template <typename T>
+    concept RvalueGetOrInsertWith = requires(T t) { std::move(t).get_or_insert_with([] { return 1; }); };
 }
 
 // 编译期：take_if 返回 Option<T>，且只能作用于非 const 左值
@@ -35,6 +47,19 @@ static_assert(std::is_same_v<
 static_assert(!RvalueTakeIf<res::Option<int>>);
 static_assert(!ConstTakeIf<res::Option<int>>);
 static_assert(requires(res::Option<int> &o) { o.take_if(&is_positive); });
+
+// 编译期：in-place 引用返回的 mutator 只能作用于非 const 左值，右值调用被拒绝
+static_assert(!RvalueInsert<res::Option<int>>);
+static_assert(!RvalueGetOrInsert<res::Option<int>>);
+static_assert(!RvalueGetOrInsertDefault<res::Option<int>>);
+static_assert(!RvalueGetOrInsertWith<res::Option<int>>);
+static_assert(requires(res::Option<int> &o) {
+    o.insert(1);
+    o.get_or_insert(2);
+    o.get_or_insert_default();
+    o.get_or_insert_with([] { return 3; });
+});
+static_assert(std::is_same_v<decltype(std::declval<res::Option<int> &>().insert(1)), int &>);
 
 TEST_CASE("take moves the value out and leaves None")
 {
