@@ -424,7 +424,9 @@ namespace pjh::result
          * @return `Option<R>`
          */
         template <typename U, typename F>
-            requires(!std::is_void_v<T>) && (!std::is_void_v<U>)
+            requires(!std::is_void_v<T>) && (!std::is_void_v<U>) &&
+                    std::invocable<F, const T &, U &> &&
+                    (!std::is_void_v<std::invoke_result_t<F, const T &, U &>>)
         [[nodiscard]] auto zip_with(Option<U> other, F &&f)
             const & -> Option<decltype(std::invoke(f, value_, other.value_))>
         {
@@ -436,7 +438,9 @@ namespace pjh::result
 
         /// @overload
         template <typename U, typename F>
-            requires(!std::is_void_v<T>) && (!std::is_void_v<U>)
+            requires(!std::is_void_v<T>) && (!std::is_void_v<U>) &&
+                    std::invocable<F, T &&, U &&> &&
+                    (!std::is_void_v<std::invoke_result_t<F, T &&, U &&>>)
         [[nodiscard]] auto zip_with(Option<U> other, F &&f) && -> Option<
             decltype(std::invoke(f, std::move(value_), std::move(other.value_)))>
         {

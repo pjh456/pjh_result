@@ -40,7 +40,37 @@ namespace
     {
         long operator()() const;
     };
+
+    // Task 18: combiner returning void must be rejected by SFINAE.
+    struct VoidCombiner
+    {
+        void operator()(int, int) const;
+    };
+
+    struct IntCombiner
+    {
+        int operator()(int, int) const;
+    };
+
+    template <typename T, typename U, typename F>
+    concept LvalueZipWith = requires(const T &a, const U &b, F f)
+    {
+        a.zip_with(b, f);
+    };
+
+    template <typename T, typename U, typename F>
+    concept RvalueZipWith = requires(T a, U b, F f)
+    {
+        std::move(a).zip_with(std::move(b), f);
+    };
 }
+
+// 编译期：zip_with 拒绝返回 void 的组合子（应无匹配函数，而非函数体硬错）
+static_assert(!LvalueZipWith<IntOpt, IntOpt, VoidCombiner>);
+static_assert(!RvalueZipWith<IntOpt, IntOpt, VoidCombiner>);
+// 编译期：非 void 组合子仍可调用
+static_assert(LvalueZipWith<IntOpt, IntOpt, IntCombiner>);
+static_assert(RvalueZipWith<IntOpt, IntOpt, IntCombiner>);
 
 // 编译期：跨值类型 zip / zip_with 的返回类型
 static_assert(std::is_same_v<
