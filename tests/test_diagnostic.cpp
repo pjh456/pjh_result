@@ -1,5 +1,6 @@
 #include <doctest/doctest.h>
 
+#include <string>
 #include <string_view>
 
 #include "pjh_result.hpp"
@@ -113,7 +114,9 @@ TEST_CASE("Context::message returns the outermost layer and kind forwards the ro
 {
     auto c = res::Context<GoodErr>(GoodErr{}).context("inner").context("outer");
 
-    CHECK(c.message() == "outer");
+    // Compare through std::string: doctest's fallback stringification of a
+    // std::string_view operand trips an MSVC STL header error (C2027).
+    CHECK(std::string(c.message()) == "outer");
     CHECK(c.kind() == GoodErr::Kind::io);
     CHECK(c.kind() == c.root_cause().kind());
 }
