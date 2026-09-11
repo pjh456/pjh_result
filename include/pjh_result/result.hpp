@@ -239,13 +239,15 @@ namespace pjh::result
         }
 
         /// @brief Nothrow move-constructs this object's active member from an rvalue `Result`
-        ///        (assumes this object's storage is empty / already destroyed).
+        ///        (assumes this object's storage is empty / already destroyed). A `Moved`
+        ///        source inherits the `Moved` state without constructing any member, so the
+        ///        inactive union member is never read.
         void construct_from_(Result &&o) noexcept
         {
             tag_ = o.tag_;
             if (tag_ == detail::Tag::Ok)
                 ::new (static_cast<void *>(std::addressof(ok_))) OkT(std::move(o.ok_));
-            else
+            else if (tag_ == detail::Tag::Err)
                 ::new (static_cast<void *>(std::addressof(err_))) E(std::move(o.err_));
         }
 
@@ -291,10 +293,14 @@ namespace pjh::result
 
     public:
         /// @brief Copy constructor: copies the other object's active member.
+        /// @throws bad_result_access when @p o is in the Moved state (a moved result is
+        ///         not copyable); no member is constructed in that case.
         Result(const Result &o)
             requires std::copy_constructible<OkT> && std::copy_constructible<E>
             : tag_(o.tag_)
         {
+            if (tag_ == detail::Tag::Moved)
+                throw bad_result_access("Result copy from moved");
             if (tag_ == detail::Tag::Ok)
                 ::new (static_cast<void *>(std::addressof(ok_))) OkT(o.ok_);
             else
@@ -302,11 +308,13 @@ namespace pjh::result
         }
 
         /// @brief Move constructor: nothrow-moves the other object's active member.
+        ///        A `Moved` source yields a `Moved` result without touching the
+        ///        inactive union member.
         Result(Result &&o) noexcept : tag_(o.tag_)
         {
             if (tag_ == detail::Tag::Ok)
                 ::new (static_cast<void *>(std::addressof(ok_))) OkT(std::move(o.ok_));
-            else
+            else if (tag_ == detail::Tag::Err)
                 ::new (static_cast<void *>(std::addressof(err_))) E(std::move(o.err_));
         }
 

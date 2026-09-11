@@ -7,6 +7,7 @@
 #include "support/instrumented.hpp"
 
 namespace res = pjh::result;
+using bad_access = pjh::result::bad_result_access;
 using pjh_test::InstanceCounter;
 using pjh_test::ThrowOnCopy;
 
@@ -172,4 +173,53 @@ TEST_CASE("no leak through rvalue transpose of an outer Err")
         CHECK(transposed.unwrap().unwrap_err().id == 32);
     }
     CHECK(InstanceCounter::live == 0);
+}
+
+TEST_CASE("move construction from a Moved result preserves Moved")
+{
+    auto r = res::Result<InstanceCounter, int>::Ok(InstanceCounter{41});
+    InstanceCounter v = std::move(r).unwrap();
+    CHECK(v.id == 41);
+    REQUIRE(r.is_moved());
+
+    auto m = std::move(r);
+    CHECK(m.is_moved());
+    CHECK_FALSE(m.is_ok());
+    CHECK_FALSE(m.is_err());
+}
+
+TEST_CASE("move assignment from a Moved result marks the target Moved")
+{
+    auto r = res::Result<int, std::string>::Ok(1);
+    (void)std::move(r).unwrap();
+    REQUIRE(r.is_moved());
+
+    auto target = res::Result<int, std::string>::Err(std::string("old"));
+    target = std::move(r);
+    CHECK(target.is_moved());
+}
+
+TEST_CASE("copy construction from a Moved result throws")
+{
+    auto r = res::Result<int, std::string>::Ok(1);
+    (void)std::move(r).unwrap();
+    REQUIRE(r.is_moved());
+
+    auto copy_r = [&] {
+        auto c = r;
+        (void)c;
+    };
+    CHECK_THROWS_AS(copy_r(), bad_access);
+}
+
+TEST_CASE("copy assignment from a Moved result throws and keeps the target")
+{
+    auto r = res::Result<int, std::string>::Ok(1);
+    (void)std::move(r).unwrap();
+    REQUIRE(r.is_moved());
+
+    auto target = res::Result<int, std::string>::Ok(99);
+    CHECK_THROWS_AS(target = r, bad_access);
+    REQUIRE(target.is_ok());
+    CHECK(target.unwrap() == 99);
 }
