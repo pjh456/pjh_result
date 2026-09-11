@@ -43,10 +43,17 @@ namespace pjh::result::detail
         !std::same_as<std::remove_cvref_t<T>,
                       std::remove_cvref_t<E>>;
 
-    /// @brief Satisfied when `X` exposes a `value_type` member (heuristic for `Option`-like types).
+    /// @brief Primary template; specialized (in option.hpp) for each `Option<T>` to
+    ///        expose its `value_type`. Mirrors `result_traits`.
+    template <typename>
+    struct option_traits;
+
+    /// @brief Satisfied when `X` is this library's `Option` (i.e. `option_traits` is
+    ///        specialized for it). A stray `value_type` member (e.g. on `std::string`,
+    ///        `std::vector` or a detail iterator) does not qualify.
     template <typename X>
     concept OptionType = requires {
-        typename std::remove_cvref_t<X>::value_type;
+        typename option_traits<std::remove_cvref_t<X>>::value_type;
     };
 
     /// @brief Satisfied when `X` exposes `first_type` / `second_type` (a pair-like type).

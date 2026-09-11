@@ -2,6 +2,7 @@
 
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "pjh_result/option.hpp"
 
@@ -69,6 +70,33 @@ static_assert(!OkOrCompat<res::Option<int>, res::Result<int, std::string>>);
 static_assert(!OkOrElseCompat<res::Option<int>, IntProducer>);
 static_assert(!OkOrElseCompat<res::Option<int>, RefProducer>);
 static_assert(!OkOrElseCompat<res::Option<int>, ResultProducer>);
+
+/// Whether `transpose` is available on a const lvalue `Result`.
+template <typename R>
+concept ConstTransposeCompat = requires(const R &r) {
+    r.transpose();
+};
+
+/// Whether `transpose` is available on an rvalue `Result`.
+template <typename R>
+concept RvalueTransposeCompat = requires(R &&r) {
+    std::move(r).transpose();
+};
+
+// 编译期：OptionType 只识别库内 Option，std::string / std::vector 的 value_type
+// 假阳性被消除。
+static_assert(res::detail::OptionType<res::Option<int>>);
+static_assert(!res::detail::OptionType<std::string>);
+static_assert(!res::detail::OptionType<std::vector<int>>);
+
+// 编译期：Result::transpose 随之只接受 Option 值类型；string/vector 被干净剔除，
+// Option 值类型仍可用（内层 T 与外层 E 不同，结果 Result<InnerV, E> 合法）。
+static_assert(ConstTransposeCompat<res::Result<res::Option<int>, std::string>>);
+static_assert(RvalueTransposeCompat<res::Result<res::Option<int>, std::string>>);
+static_assert(!ConstTransposeCompat<res::Result<std::string, int>>);
+static_assert(!RvalueTransposeCompat<res::Result<std::string, int>>);
+static_assert(!ConstTransposeCompat<res::Result<std::vector<int>, int>>);
+static_assert(!RvalueTransposeCompat<res::Result<std::vector<int>, int>>);
 
 TEST_CASE("ok_or converts Some to Ok, None to Err")
 {

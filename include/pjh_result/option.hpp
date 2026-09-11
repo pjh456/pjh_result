@@ -32,6 +32,14 @@ namespace pjh::result
         {
         };
 
+        /// @brief Trait specialization exposing the value type of an `Option`, used by
+        ///        the `OptionType` concept (mirrors `result_traits`).
+        template <typename T>
+        struct option_traits<Option<T>>
+        {
+            using value_type = T;
+        };
+
     }
 
     /**
