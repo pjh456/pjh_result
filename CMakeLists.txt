@@ -12,8 +12,15 @@ target_include_directories(pjh_result INTERFACE
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 target_compile_features(pjh_result INTERFACE cxx_std_20)
 
-option(PJH_RESULT_BUILD_TESTS "Build tests" ${PROJECT_IS_TOP_LEVEL})
-option(PJH_RESULT_BUILD_EXAMPLES "Build examples" ${PROJECT_IS_TOP_LEVEL})
+# CMake < 3.21 无 PROJECT_IS_TOP_LEVEL；用版本无关惯用式判定顶层工程
+if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
+    set(PJH_RESULT_IS_TOP_LEVEL ON)
+else()
+    set(PJH_RESULT_IS_TOP_LEVEL OFF)
+endif()
+
+option(PJH_RESULT_BUILD_TESTS "Build tests" ${PJH_RESULT_IS_TOP_LEVEL})
+option(PJH_RESULT_BUILD_EXAMPLES "Build examples" ${PJH_RESULT_IS_TOP_LEVEL})
 
 if(PJH_RESULT_BUILD_TESTS)
     enable_testing()
