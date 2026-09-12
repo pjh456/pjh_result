@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(pjh_result VERSION 0.1.0 LANGUAGES CXX)
+project(pjh_result VERSION 0.2.0 LANGUAGES CXX)
 
 add_library(pjh_result INTERFACE)
 add_library(pjh::result ALIAS pjh_result)
